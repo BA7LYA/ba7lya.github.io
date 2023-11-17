@@ -22,6 +22,8 @@ comment: true
 
 # I.02: Avoid non-const global variables
 
+>避免使用非`const`全局变量。
+
 ## Reason
 
 Non-`const` global variables hide dependencies and make the dependencies subject to unpredictable changes.
