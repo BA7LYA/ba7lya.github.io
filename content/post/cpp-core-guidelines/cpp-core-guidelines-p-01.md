@@ -28,11 +28,11 @@ comment: true
 
 Compilers don’t read comments (or design documents) and neither do many programmers (consistently).
 
-> 译：编译器不读注释（或设计文档），许多程序员也不读注释（一贯如此）。
+> 编译器不读注释（或设计文档），许多程序员也不读注释（一贯如此）。
 
 What is expressed in code has defined semantics and can (in principle) be checked by compilers and other tools.
 
-> 译：代码中表达的内容具有定义的语义，并且（原则上）可以由编译器和其他工具进行检查。
+> 代码中表达的内容具有定义的语义，并且（原则上）可以由编译器和其他工具进行检查。
 
 ## Example
 
@@ -103,12 +103,10 @@ void f(std::vector<std::string>& v)
 
 A well-designed library expresses intent (what is to be done, rather than just how something is being done) far better than direct use of language features.
 
-> 译：设计良好的库比直接使用语言特性更好地表达意图（要做什么，而不仅仅是如何做某事）。
+> 设计良好的库比直接使用语言特性更好地表达意图（要做什么，而不仅仅是如何做某事）。
 
 A C++ programmer should know the basics of the standard library, and use it where appropriate. Any programmer should know the basics of the foundation libraries of the project being worked on, and use them appropriately. Any programmer using these guidelines should know the guidelines support library, and use it appropriately.
 
-> 译：
->
 > C++程序员应该了解标准库的基础知识，并在适当的地方使用它。
 >
 > 任何程序员都应该了解正在处理的项目的基础库的基本知识，并适当地使用它们。
