@@ -119,8 +119,8 @@ An interface is a contract between two parts of a program. Precisely stating wha
 Interface rule summary:
 
 - [I.01: Make interfaces explicit]({{< ref "cpp-core-guidelines-i-01.md" >}})
-- I.02: Avoid non-`const` global variables
-- I.03: Avoid singletons
+- [I.02: Avoid non-`const` global variables]({{< ref "cpp-core-guidelines-i-02.md" >}})
+- [I.03: Avoid singletons]({{< ref "cpp-core-guidelines-i-03.md" >}})
 - I.04: Make interfaces precisely and strongly typed
 - I.05: State preconditions (if any)
 - I.06: Prefer `Expects()` for expressing preconditions

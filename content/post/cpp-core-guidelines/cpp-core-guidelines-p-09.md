@@ -21,7 +21,7 @@ tags:
 comment: true
 ---
 
-# P.9: Don’t waste time or space
+# P.09: Don’t waste time or space
 
 > 不要浪费时间和空间。
 

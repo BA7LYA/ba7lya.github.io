@@ -21,7 +21,7 @@ tags:
 comment: true
 ---
 
-# P.3: Express intent
+# P.03: Express intent
 
 >表达意图。
 

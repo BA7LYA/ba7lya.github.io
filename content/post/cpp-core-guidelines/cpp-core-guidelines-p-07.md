@@ -21,7 +21,7 @@ tags:
 comment: true
 ---
 
-# P.7: Catch run-time errors early
+# P.07: Catch run-time errors early
 
 > 尽早捕获运行时错误。
 

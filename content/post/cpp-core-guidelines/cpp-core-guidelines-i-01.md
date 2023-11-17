@@ -20,7 +20,7 @@ tags:
 comment: true
 ---
 
-# I.1: Make interfaces explicit
+# I.01: Make interfaces explicit
 
 >使接口显式。
 

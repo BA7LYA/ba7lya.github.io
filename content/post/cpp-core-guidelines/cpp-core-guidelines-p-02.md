@@ -20,7 +20,7 @@ tags:
 comment: true
 ---
 
-# P.2: Write in ISO Standard C++
+# P.02: Write in ISO Standard C++
 
 >使用ISO标准C++编写程序。
 

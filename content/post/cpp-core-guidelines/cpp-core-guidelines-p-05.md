@@ -21,7 +21,7 @@ tags:
 comment: true
 ---
 
-# P.5: Prefer compile-time checking to run-time checking
+# P.05: Prefer compile-time checking to run-time checking
 
 > 比起运行时检查，编译时检查更好。
 

@@ -21,7 +21,7 @@ tags:
 comment: true
 ---
 
-# P.6: What cannot be checked at compile time should be checkable at run time
+# P.06: What cannot be checked at compile time should be checkable at run time
 
 >在编译时不能检查的应该在运行时检查。
 

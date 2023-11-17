@@ -21,7 +21,7 @@ tags:
 comment: true
 ---
 
-# P.4: Ideally, a program should be statically type safe
+# P.04: Ideally, a program should be statically type safe
 
 > 理想情况下，程序应该是静态类型安全的。
 

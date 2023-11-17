@@ -21,7 +21,7 @@ tags:
 comment: true
 ---
 
-# P.8: Don’t leak any resources
+# P.08: Don’t leak any resources
 
 > 不要泄露任何资源。
 
