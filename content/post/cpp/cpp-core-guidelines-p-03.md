@@ -1,7 +1,7 @@
 ---
-title: "C++ Core Guidelines P.03"
+title: "C++ Core Guidelines P.03 注解"
 date: 2023-11-17T21:33:23+08:00
-description: "C++ Core Guidelines P.03"
+description: "C++ Core Guidelines P.03 注解"
 featured: true
 draft: false
 toc: false
