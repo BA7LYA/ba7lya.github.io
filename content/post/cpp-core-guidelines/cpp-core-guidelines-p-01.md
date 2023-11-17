@@ -62,7 +62,9 @@ The second version leaves the reader guessing and opens more possibilities for u
 > };
 > ```
 
-## Example, bad
+## Example
+
+### Bad
 
 This loop is a restricted form of `std::find`:
 
@@ -83,7 +85,7 @@ void f(std::vector<std::string>& v) // 注：在一个字符串vector中寻找�
 }
 ```
 
-## Example, good
+### Good
 
 A much clearer expression of intent would be:
 
@@ -115,18 +117,21 @@ A C++ programmer should know the basics of the standard library, and use it wher
 
 ## Example
 
+### Bad
+
 ```c++
-change_speed(double s);   // bad: what does s signify?
+change_speed(double s);	// bad: what does s signify?
 // ...
-change_speed(2.3);
+change_speed(2.3);		// error: no unit
 ```
+
+### Good
 
 A better approach is to be explicit about the meaning of the double (new speed or delta on old speed?) and the unit used:
 
 ```c++
 change_speed(Speed s);    // better: the meaning of s is specified
 // ...
-change_speed(2.3);        // error: no unit
 change_speed(23_m / 10s);  // meters per second
 ```
 

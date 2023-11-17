@@ -64,7 +64,9 @@ Often, a template parameter can eliminate the `void*` turning it into a `T*` or 
 
 >通常，模板参数可以消除`void*`，将其转换为`T*`或`T&`。对于泛型代码，这些`T`可以是一般的或概念约束的模板参数。
 
-## Example, bad
+## Example
+
+### Bad
 
 Consider:
 
@@ -81,6 +83,8 @@ It is clear that the caller is describing a rectangle, but it is unclear what pa
 
 > 注：最后两个参数可以是对角的坐标`x1,y1`，也可以是矩形的长和宽`hight,width`。
 
+### Good
+
 Comments and parameter names can help, but we could be explicit:
 
 ```c++
@@ -95,7 +99,9 @@ Obviously, we cannot catch all errors through the static type system (e.g., the 
 
 > 显然，我们不能通过静态类型系统捕获所有错误(例如，第一个参数应该是左上角的事实留给约定（命名和注释））。
 
-## Example, bad
+## Example
+
+### Bad
 
 Consider:
 
@@ -106,6 +112,8 @@ set_settings(true, false, 42);	// what do the numbers specify?
 The parameter types and their values do not communicate what settings are being specified or what those values mean.
 
 > 参数类型和它们的值不能传达指定的设置或这些值的含义。
+
+### Good
 
 This design is more explicit, safe and legible:
 

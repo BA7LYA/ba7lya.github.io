@@ -41,7 +41,9 @@ Ideally, we catch all errors (that are not errors in the programmer’s logic) a
 >
 > 然而，我们应该努力编写原则上可以被检查的程序，给予足够的资源（分析程序、运行时检查、机器资源、时间）。
 
-## Example, bad
+## Example
+
+### Bad
 
 ```c++
 // separately compiled, possibly dynamically loaded
@@ -58,7 +60,7 @@ Here, a crucial bit of information (the number of elements) has been so thorough
 
 > 在这里，关键的信息位（元素的数量）被完全“模糊”了，以至于当`f()`是ABI的一部分时，静态分析可能变得不可行，动态检查可能非常困难，因此我们无法检测该指针。我们可以将有用的信息嵌入到自由存储区（堆）中，但这需要对系统和编译器进行全局更改。这里的设计使得错误检测非常困难。
 
-## Example, bad
+### Bad
 
 We can of course pass the number of elements along with the pointer:
 
@@ -82,7 +84,7 @@ Also, it is implicit that `f2()` is supposed to `delete` its argument (or did th
 
 > 此外，`f2()`应该`delete`它的参数是隐含的（或者调用者犯了第二个错误？）
 
-## Example, bad
+### Bad
 
 The standard library resource management pointers fail to pass the size when they point to an object:
 
@@ -98,7 +100,7 @@ void g3(int n)
 }
 ```
 
-## Example, good
+### Good
 
 We need to pass the pointer and the number of elements as an integral object:
 
@@ -128,26 +130,37 @@ How do we transfer both ownership and all information needed for validating use?
 
 > 我们如何转移所有权和验证使用所需的所有信息？
 
-```c++
-// OK: move
-std::vector<int> f5(int n) {
-    std::vector<int> v(n);
-    // ... initialize v ...
-    return v; // <= RVO: implicit std::move()
-}
+### Bad
 
+```c++
 // bad: loses n
 std::unique_ptr<int[]> f6(int n) {
     auto p = std::make_unique<int[]>(n);
     // ... initialize *p ...
     return p; // <=  return p but without n
 }
+```
 
+### Bad
+
+```c++
 // bad: loses n and we might forget to delete
 gsl::owner<int*> f7(int n) {
     gsl::owner<int*> p = new int[n];
     // ... initialize *p ...
     return p;
+}
+```
+
+### Good
+
+
+```c++
+// OK: move
+std::vector<int> f5(int n) {
+    std::vector<int> v(n);
+    // ... initialize v ...
+    return v; // <= RVO: implicit std::move()
 }
 ```
 

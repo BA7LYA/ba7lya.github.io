@@ -37,6 +37,8 @@ Code clarity and performance. You don’t need to write error handlers for error
 
 ## Example
 
+### Bad
+
 ```c++
 // Int is an alias used for integers
 int bits = 0;         // don't: avoidable code
@@ -52,6 +54,8 @@ This example fails to achieve what it is trying to achieve (because overflow is 
 
 > 这个例子没有达到它想要达到的目标（因为overflow是未定义的），应该用一个简单的`static_assert`替换。
 
+### Good
+
 ```c++
 // Int is an alias used for integers
 static_assert(sizeof(Int) >= 4);	// do: compile-time check
@@ -61,7 +65,7 @@ Or better still just use the type system and replace `Int` with `int32_t`.
 
 ## Example
 
-bad
+### Bad
 
 ```c++
 void read(int* p, int n);   // read max n integers into *p
@@ -70,7 +74,7 @@ int a[100];
 read(a, 1000);    // bad, off the end
 ```
 
-better
+### Good
 
 ```c++
 void read(std::span<int> r); // read into the range of integers r

@@ -33,6 +33,8 @@ Avoid “mysterious” crashes. Avoid errors leading to (possibly unrecognized) 
 
 ## Example
 
+### Bad
+
 ```c++
 void increment1(int* p, int n) {	// bad: error-prone
     for (int i = 0; i < n; ++i) {
@@ -52,6 +54,8 @@ void use1(int m) {
 
 Here we made a small error in `use1` that will lead to corrupted data or a crash. The (pointer, count)-style interface leaves `increment1()` with no realistic way of defending itself against out-of-range errors. If we could check subscripts for out of range access, then the error would not be discovered until `p[10]` was accessed.
 
+### Better than Bad
+
 We could check earlier and improve the code:
 
 ```c++
@@ -70,7 +74,11 @@ void use2(int m) {
 }
 ```
 
-Now, `m <= n` can be checked at the point of call (early) rather than later. If all we had was a typo so that we meant to use `n` as the bound, the code could be further simplified (eliminating the possibility of an error):
+Now, `m <= n` can be checked at the point of call (early) rather than later.
+
+### Good
+
+If all we had was a typo so that we meant to use `n` as the bound, the code could be further simplified (eliminating the possibility of an error):
 
 ```c++
 void use3(int m) {

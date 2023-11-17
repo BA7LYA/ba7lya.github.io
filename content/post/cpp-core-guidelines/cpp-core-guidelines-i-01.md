@@ -54,7 +54,9 @@ Sometimes we control the details of a set of operations by an environment variab
 
 >有时我们通过一个环境变量来控制一组操作的细节，例如，正常输出与详细输出，调试输出与优化输出。使用非本地控制可能会造成混淆，但它只控制其他固定语义的实现细节。
 
-## Example, bad
+## Example
+
+### Bad
 
 Reporting through non-local variables (e.g., `errno`) is easily ignored. For example:
 
@@ -65,7 +67,7 @@ fprintf(connection, "logging: %d %d %d\n", x, y, s);
 
 What if the connection goes down so that no logging output is produced? See I.???.
 
-## Alternative
+### Alternative
 
 Throw an exception. An exception cannot be ignored.
 

@@ -37,7 +37,7 @@ Even a slow growth in resources will, over time, exhaust the availability of tho
 
 ## Example
 
-Bad
+### Bad
 
 ```c++
 void f(char* name) {
@@ -48,6 +48,8 @@ void f(char* name) {
     fclose(input);
 }
 ```
+
+### Good
 
 Prefer RAII (Resource Acquisition Is Initialization)<sup>[2]</sup>:
 
