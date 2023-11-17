@@ -28,7 +28,7 @@ The rules in this section are very general.
 
 Philosophy rules summary:
 
-- P.01: Express ideas directly in code {{< ref "cpp-core-guidelines-p-01.md" >}}
+- [P.01: Express ideas directly in code]({{< ref "cpp-core-guidelines-p-01.md" >}})
 - P.02: Write in ISO Standard C++
 - P.03: Express intent
 - P.04: Ideally, a program should be statically type safe
