@@ -11,7 +11,6 @@ featureImageAlt: 'Description of image'
 featureImageCap: 'This is the featured image.'
 thumbnail: "/images/path/thumbnail.png"
 shareImage: "/images/path/share.png"
-codeMaxLines: 10
 codeLineNumbers: true
 figurePositionShow: true
 categories:

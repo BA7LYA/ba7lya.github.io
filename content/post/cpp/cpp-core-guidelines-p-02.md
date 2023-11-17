@@ -10,7 +10,6 @@ featureImageAlt: 'C++ Core Guidelines'
 featureImageCap: 'source: https://github.com/isocpp/CppCoreGuidelines'
 thumbnail: "/images/iso_cpp_logo.png"
 shareImage: "/images/iso_cpp_logo.png"
-codeMaxLines: 10
 codeLineNumbers: true
 figurePositionShow: true
 categories:
