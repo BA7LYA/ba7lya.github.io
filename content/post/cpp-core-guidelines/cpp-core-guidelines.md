@@ -107,3 +107,34 @@ Philosophical rules are generally not mechanically checkable. However, individua
 >哲学规则通常不能机械地检查。然而，反映这些哲学主题的个别规则可以。
 >
 >没有哲学基础，更具体的/具体的/可检查的规则会缺乏基本原理。
+
+## Interfaces
+
+An interface is a contract between two parts of a program. Precisely stating what is expected of a supplier of a service and a user of that service is essential. Having good (easy-to-understand, encouraging efficient use, not error-prone, supporting testing, etc.) interfaces is probably the most important single aspect of code organization.
+
+>接口是程序两个部分之间的契约。准确地说明对服务提供者和服务用户的期望是至关重要的。
+>
+>拥有良好的接口（易于理解、鼓励有效使用、不容易出错、支持测试等）可能是代码组织中最重要的一个方面。
+
+Interface rule summary:
+
+- [I.01: Make interfaces explicit]({{< ref "cpp-core-guidelines-i-01.md" >}})
+- I.02: Avoid non-`const` global variables
+- I.03: Avoid singletons
+- I.04: Make interfaces precisely and strongly typed
+- I.05: State preconditions (if any)
+- I.06: Prefer `Expects()` for expressing preconditions
+- I.07: State postconditions
+- I.08: Prefer `Ensures()` for expressing postconditions
+- I.09: If an interface is a template, document its parameters using concepts
+- I.10: Use exceptions to signal a failure to perform a required task
+- I.11: Never transfer ownership by a raw pointer (`T*`) or reference (`T&`)
+- I.12: Declare a pointer that must not be null as not_null
+- I.13: Do not pass an array as a single pointer
+- I.22: Avoid complex initialization of global objects
+- I.23: Keep the number of function arguments low
+- I.24: Avoid adjacent parameters that can be invoked by the same arguments in either order with different meaning
+- I.25: Prefer empty abstract classes as interfaces to class hierarchies
+- I.26: If you want a cross-compiler ABI, use a C-style subset
+- I.27: For stable library ABI, consider the Pimpl idiom
+- I.30: Encapsulate rule violations
