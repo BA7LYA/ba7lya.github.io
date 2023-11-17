@@ -1,0 +1,4 @@
+baseURL = 'https://ba7lya.github.io/'
+languageCode = 'en-us'
+title = 'BA7LYA'
+theme = 'hugo-clarity'
