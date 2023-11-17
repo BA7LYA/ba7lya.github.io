@@ -3,7 +3,7 @@ title: "C++ Core Guidelines"
 date: 2023-11-18T02:39:39+08:00
 description: "C++ Core Guidelines"
 featured: true
-toc: false
+toc: true
 usePageBundles: false
 featureImage: "/images/cpp-core-guidelines.png"
 featureImageAlt: 'C++ Core Guidelines'

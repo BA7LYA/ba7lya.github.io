@@ -3,7 +3,7 @@ title: "C++ Core Guidelines I.02 注解"
 date: 2023-11-18T03:35:48+08:00
 description: "C++ Core Guidelines I.02 注解"
 featured: true
-toc: false
+toc: true
 usePageBundles: false
 featureImage: "/images/cpp-core-guidelines.png"
 featureImageAlt: 'C++ Core Guidelines'

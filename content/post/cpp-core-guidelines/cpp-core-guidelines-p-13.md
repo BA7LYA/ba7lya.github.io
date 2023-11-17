@@ -4,7 +4,7 @@ date: 2023-11-18T02:24:41+08:00
 description: "C++ Core Guidelines P.13 注解"
 featured: true
 draft: false
-toc: false
+toc: true
 usePageBundles: false
 featureImage: "/images/cpp-core-guidelines.png"
 featureImageAlt: 'C++ Core Guidelines'

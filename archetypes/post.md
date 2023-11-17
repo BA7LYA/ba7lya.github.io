@@ -4,7 +4,7 @@ date: {{ .Date }}
 description: "Article description."
 featured: true
 draft: true
-toc: false
+toc: true
 usePageBundles: false
 featureImage: "/images/path/file.jpg"
 featureImageAlt: 'Description of image'
