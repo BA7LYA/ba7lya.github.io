@@ -65,6 +65,6 @@ For example:
 
 ## Reference
 
-[1] [C++ Core Guidelines P.4: Ideally, a program should be statically type safe](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p4-ideally-a-program-should-be-statically-type-safe)
+[1] [C++ Core Guidelines P.04: Ideally, a program should be statically type safe](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p4-ideally-a-program-should-be-statically-type-safe)
 
 [2] [What is array-to-pointer conversion aka. decay?](https://stackoverflow.com/questions/1461432/what-is-array-to-pointer-conversion-aka-decay)

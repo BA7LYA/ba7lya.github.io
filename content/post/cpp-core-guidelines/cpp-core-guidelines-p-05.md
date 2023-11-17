@@ -92,4 +92,4 @@ Don’t postpone to run time what can be done well at compile time.
 
 ## Reference
 
-[1] [C++ Core Guidelines P.5: Prefer compile-time checking to run-time checking](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p5-prefer-compile-time-checking-to-run-time-checking)
+[1] [C++ Core Guidelines P.05: Prefer compile-time checking to run-time checking](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p5-prefer-compile-time-checking-to-run-time-checking)

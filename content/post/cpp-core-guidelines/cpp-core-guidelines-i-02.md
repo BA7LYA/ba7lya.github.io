@@ -118,6 +118,6 @@ The rule is “avoid”, not “don’t use.” Of course there will be (rare) e
 
 ## References
 
-[1] [C++ Core Guidelines I.2: Avoid non-`const` global variables](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#i2-avoid-non-const-global-variables)
+[1] [C++ Core Guidelines I.02: Avoid non-`const` global variables](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#i2-avoid-non-const-global-variables)
 
 [2] [C++ Core Guidelines F.call: Parameter passing](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#fcall-parameter-passing)

@@ -63,3 +63,7 @@ Be careful not to become dependent on over-elaborate or over-specialized tool ch
 > 注意不要依赖于过于复杂或过于专门化的工具链。这些会使原本可移植的代码不可移植。
 
 > 注：优先使用跨平台的工具，例如VSCode、Vim、CMake，可以避免重复的学习时间成本和非必要的心智负担。
+
+## Reference
+
+[1] [C++ Core Guidelines P.12: Use supporting tools as appropriate](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p12-use-supporting-tools-as-appropriate)

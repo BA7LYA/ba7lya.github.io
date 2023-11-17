@@ -169,4 +169,4 @@ gsl::owner<int*> f7(int n) {
 
 ## Reference
 
-[1] [C++ Core Guidelines P.6: What cannot be checked at compile time should be checkable at run time](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p6-what-cannot-be-checked-at-compile-time-should-be-checkable-at-run-time)
+[1] [C++ Core Guidelines P.06: What cannot be checked at compile time should be checkable at run time](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p6-what-cannot-be-checked-at-compile-time-should-be-checkable-at-run-time)

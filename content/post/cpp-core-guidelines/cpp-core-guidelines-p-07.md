@@ -168,4 +168,4 @@ The physical law for a jet ($e^2 < x^2 + y^2 + z^2$) is not an invariant because
 
 ## Reference
 
-[1] [C++ Core Guidelines P.7: Catch run-time errors early](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p7-catch-run-time-errors-early)
+[1] [C++ Core Guidelines P.07: Catch run-time errors early](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p7-catch-run-time-errors-early)

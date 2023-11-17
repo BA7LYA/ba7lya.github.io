@@ -95,4 +95,4 @@ An interface should be a function or a set of functions. Functions can be functi
 
 ## Reference
 
-[1] [C++ Core Guidelines I.1: Make interfaces explicit](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#i1-make-interfaces-explicit)
+[1] [C++ Core Guidelines I.01: Make interfaces explicit](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#i1-make-interfaces-explicit)
