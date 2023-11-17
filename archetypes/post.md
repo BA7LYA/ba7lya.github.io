@@ -20,5 +20,3 @@ tags:
   - Tag_name2
 comment: true
 ---
-
-**Insert Lead paragraph here.**
