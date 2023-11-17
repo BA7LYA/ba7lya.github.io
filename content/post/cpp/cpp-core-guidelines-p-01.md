@@ -22,6 +22,8 @@ comment: true
 
 # P.01: Express ideas directly in code
 
+> 直接用代码表达想法（，而不是用注释或者让接口使用者去猜）。
+
 ## Reason
 
 Compilers don’t read comments (or design documents) and neither do many programmers (consistently).

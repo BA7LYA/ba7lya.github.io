@@ -23,6 +23,10 @@ comment: true
 
 # P.8: Don’t leak any resources
 
+> 不要泄露任何资源。
+
+> 注：大实话、大废话。
+
 ## Reason
 
 Even a slow growth in resources will, over time, exhaust the availability of those resources. This is particularly important for long-running programs, but is an essential piece of responsible programming behavior.

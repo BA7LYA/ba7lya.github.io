@@ -23,6 +23,10 @@ comment: true
 
 # P.10: Prefer immutable data to mutable data
 
+> 与可变数据相比，不可变数据更好。
+
+> 注：尽可能多的使用`constexpr`。
+
 ## Reason
 
 It is easier to reason about constants than about variables. Something immutable cannot change unexpectedly. Sometimes immutability enables better optimization. You can’t have a data race on a constant.

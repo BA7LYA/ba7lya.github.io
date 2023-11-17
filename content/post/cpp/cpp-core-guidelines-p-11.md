@@ -25,6 +25,8 @@ comment: true
 
 > 封装混乱的结构，而不是在代码中展开。
 
+> 注：尽可能的不要让接口的用户看到他不需要用到的东西，良好地封装，保持接口简洁、易用、不易用错。
+
 ## Reason
 
 Messy code is more likely to hide bugs and harder to write. A good interface is easier and safer to use. Messy, low-level code breeds more such code.

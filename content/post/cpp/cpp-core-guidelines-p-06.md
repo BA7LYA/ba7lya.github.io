@@ -23,6 +23,8 @@ comment: true
 
 # P.6: What cannot be checked at compile time should be checkable at run time
 
+>在编译时不能检查的应该在运行时检查。
+
 ## Reason
 
 Leaving hard-to-detect errors in a program is asking for crashes and bad results.

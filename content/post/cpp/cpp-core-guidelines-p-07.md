@@ -23,6 +23,8 @@ comment: true
 
 # P.7: Catch run-time errors early
 
+> 尽早捕获运行时错误。
+
 ## Reason
 
 Avoid “mysterious” crashes. Avoid errors leading to (possibly unrecognized) wrong results.

@@ -23,6 +23,10 @@ comment: true
 
 # P.5: Prefer compile-time checking to run-time checking
 
+> 比起运行时检查，编译时检查更好。
+
+> 注：编译器检查 > 运行时检查 > 运行时报错 > 未定义行为。
+
 ## Reason
 
 Code clarity and performance. You don’t need to write error handlers for errors caught at compile time.

@@ -23,6 +23,8 @@ comment: true
 
 # P.3: Express intent
 
+>表达意图。
+
 ## Reason
 
 Unless the intent of some code is stated (e.g., in names or comments), it is impossible to tell whether the code does what it is supposed to do.
@@ -31,7 +33,7 @@ Unless the intent of some code is stated (e.g., in names or comments), it is imp
 
 ## Example
 
-Bad
+### Bad
 
 ```c++
 gsl::index i = 0;
@@ -48,7 +50,7 @@ The intent of “just” looping over the elements of `v` is not expressed here.
 >
 > 读者不能仅仅从这段代码中知道具体的意图。
 
-Better
+### Better
 
 ```c++
 for (const auto& x : v) {
@@ -69,6 +71,8 @@ for (auto& x : v) {
 ```
 
 For more details about for-statements, see ES.71<sup>[2]</sup>.
+
+### Best
 
 Sometimes better still, use a named algorithm.
 

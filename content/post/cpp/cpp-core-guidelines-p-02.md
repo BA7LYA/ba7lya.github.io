@@ -22,6 +22,10 @@ comment: true
 
 # P.2: Write in ISO Standard C++
 
+>使用ISO标准C++编写程序。
+
+> 注：除非必需或者绕不开，尽量不使用平台特定的或者编译器特定的扩展编写C++程序。
+
 ## Reason
 
 This is a set of guidelines for writing ISO Standard C++.
