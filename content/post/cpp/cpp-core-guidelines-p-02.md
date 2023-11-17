@@ -63,3 +63,7 @@ There are environments where restrictions on use of standard C++ language or lib
 Use an up-to-date C++ compiler (currently C++20 or C++17) with a set of options that do not accept extensions.
 
 > 使用带有一组不接受扩展的选项的最新C++编译器（当前为C++ 20或C++ 17）。
+
+## Reference
+
+[1] [C++ Core Guidelines P.02](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#p2-write-in-iso-standard-c)
