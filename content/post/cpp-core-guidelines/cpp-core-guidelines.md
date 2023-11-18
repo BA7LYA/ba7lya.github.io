@@ -130,11 +130,11 @@ Interface rule summary:
 - [I.10: Use exceptions to signal a failure to perform a required task]({{< ref "cpp-core-guidelines-i-10.md" >}})
 - [I.11: Never transfer ownership by a raw pointer (`T*`) or reference (`T&`)]({{< ref "cpp-core-guidelines-i-11.md" >}})
 - [I.12: Declare a pointer that must not be null as `not_null`]({{< ref "cpp-core-guidelines-i-12.md" >}})
-- I.13: Do not pass an array as a single pointer
-- I.22: Avoid complex initialization of global objects
-- I.23: Keep the number of function arguments low
-- I.24: Avoid adjacent parameters that can be invoked by the same arguments in either order with different meaning
-- I.25: Prefer empty abstract classes as interfaces to class hierarchies
-- I.26: If you want a cross-compiler ABI, use a C-style subset
-- I.27: For stable library ABI, consider the Pimpl idiom
-- I.30: Encapsulate rule violations
+- [I.13: Do not pass an array as a single pointer]({{< ref "cpp-core-guidelines-i-13.md" >}})
+- [I.22: Avoid complex initialization of global objects]({{< ref "cpp-core-guidelines-i-22.md" >}})
+- [I.23: Keep the number of function arguments low]({{< ref "cpp-core-guidelines-i-23.md" >}})
+- [I.24: Avoid adjacent parameters that can be invoked by the same arguments in either order with different meaning]({{< ref "cpp-core-guidelines-i-24.md" >}})
+- [I.25: Prefer empty abstract classes as interfaces to class hierarchies]({{< ref "cpp-core-guidelines-i-25.md" >}})
+- [I.26: If you want a cross-compiler ABI, use a C-style subset]({{< ref "cpp-core-guidelines-i-26.md" >}})
+- [I.27: For stable library ABI, consider the Pimpl idiom]({{< ref "cpp-core-guidelines-i-27.md" >}})
+- [I.30: Encapsulate rule violations]({{< ref "cpp-core-guidelines-i-30.md" >}})
