@@ -83,7 +83,13 @@ Now, the dynamic nature of `istream` ownership has been encapsulated. Presumably
 ## Enforcement
 
 - Hard, it is hard to decide what rule-breaking code is essential
+
+  - > 很难，很难决定哪些违反规则的代码是必要的。
+
 - Flag rule suppression that enable rule-violations to cross interfaces
+
+  - >检查违反规则的跨接口行为。
+
 
 ## Reference
 
