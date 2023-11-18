@@ -55,7 +55,7 @@ This violated the rule against uninitialized variables, the rule against ignorin
 if (owned) delete inp;
 ```
 
-We could handle this particular example by using `unique_ptr` with a special deleter that does nothing for `cin`, but that’s complicated for novices (who can easily encounter this problem) and the example is an example of a more general problem where a property that we would like to consider static (here, ownership) needs infrequently be addressed at run time. The common, most frequent, and safest examples can be handled statically, so we don’t want to add cost and complexity to those. But we must also cope with the uncommon, less-safe, and necessarily more expensive cases. Such examples are discussed in [C++ Memory Model](http://www.stroustrup.com/resource-model.pdf).
+We could handle this particular example by using `unique_ptr` with a special deleter that does nothing for `cin`, but that’s complicated for novices (who can easily encounter this problem) and the example is an example of a more general problem where a property that we would like to consider static (here, ownership) needs infrequently be addressed at run time. The common, most frequent, and safest examples can be handled statically, so we don’t want to add cost and complexity to those. But we must also cope with the uncommon, less-safe, and necessarily more expensive cases. Such examples are discussed in C++ Memory Model<sup>[2]</sup>.
 
 So, we write a class
 
