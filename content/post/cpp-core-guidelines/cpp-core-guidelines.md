@@ -138,3 +138,74 @@ Interface rule summary:
 - [I.26: If you want a cross-compiler ABI, use a C-style subset]({{< ref "cpp-core-guidelines-i-26.md" >}})
 - [I.27: For stable library ABI, consider the Pimpl idiom]({{< ref "cpp-core-guidelines-i-27.md" >}})
 - [I.30: Encapsulate rule violations]({{< ref "cpp-core-guidelines-i-30.md" >}})
+
+## Functions
+
+A function specifies an action or a computation that takes the system from one consistent state to the next. It is the fundamental building block of programs.
+
+>函数指定将系统从一个一致状态转移到下一个一致状态的操作或计算。它是程序的基本组成部分。
+
+It should be possible to name a function meaningfully, to specify the requirements of its argument, and clearly state the relationship between the arguments and the result. An implementation is not a specification. Try to think about what a function does as well as about how it does it. Functions are the most critical part in most interfaces, so see the interface rules.
+
+>应该可以有意义地命名函数，指定其参数的要求，并清楚地说明参数与结果之间的关系。实现不是规范。
+>
+>试着去思考一个函数是做什么的，以及它是如何做的。
+>
+>函数是大多数接口中最关键的部分，因此请参阅接口规则。
+
+Function definition rules:
+
+- [F.01: “Package” meaningful operations as carefully named functions]({{< ref "cpp-core-guidelines-f-01.md" >}})
+- [F.02: A function should perform a single logical operation]({{< ref "cpp-core-guidelines-f-02.md" >}})
+- [F.03: Keep functions short and simple]({{< ref "cpp-core-guidelines-f-03.md" >}})
+- [F.04: If a function might have to be evaluated at compile time, declare it constexpr]({{< ref "cpp-core-guidelines-f-04.md" >}})
+- [F.05: If a function is very small and time-critical, declare it inline]({{< ref "cpp-core-guidelines-f-05.md" >}})
+- [F.06: If your function must not throw, declare it `noexcept`]({{< ref "cpp-core-guidelines-f-06.md" >}})
+- [F.07: For general use, take `T*` or `T&` arguments rather than smart pointers]({{< ref "cpp-core-guidelines-f-07.md" >}})
+- [F.08: Prefer pure functions]({{< ref "cpp-core-guidelines-f-08.md" >}})
+- [F.09: Unused parameters should be unnamed]({{< ref "cpp-core-guidelines-f-09.md" >}})
+- [F.10: If an operation can be reused, give it a name]({{< ref "cpp-core-guidelines-f-10.md" >}})
+- [F.11: Use an unnamed lambda if you need a simple function object in one place only]({{< ref "cpp-core-guidelines-f-11.md" >}})
+
+Parameter passing expression rules:
+
+- F.15: Prefer simple and conventional ways of passing information
+- F.16: For “in” parameters, pass cheaply-copied types by value and others by reference to `const`
+- F.17: For “in-out” parameters, pass by reference to non-`const`
+- F.18: For “will-move-from” parameters, pass by `X&&` and `std::move` the parameter
+- F.19: For “forward” parameters, pass by `TP&&` and only `std::forward` the parameter
+- F.20: For “out” output values, prefer return values to output parameters
+- F.21: To return multiple “out” values, prefer returning a struct or tuple
+- F.60: Prefer `T*` over `T&` when “no argument” is a valid option
+
+Parameter passing semantic rules:
+
+- F.22: Use `T*` or `owner<T*>` to designate a single object
+- F.23: Use a `not_null<T>` to indicate that “null” is not a valid value
+- F.24: Use a `span<T>` or a `span_p<T>` to designate a half-open sequence
+- F.25: Use a `zstring` or a `not_null<zstring>` to designate a C-style string
+- F.26: Use a `unique_ptr<T>` to transfer ownership where a pointer is needed
+- F.27: Use a `shared_ptr<T>` to share ownership
+
+Value return semantic rules:
+
+- F.42: Return a `T*` to indicate a position (only)
+- F.43: Never (directly or indirectly) return a pointer or a reference to a local object
+- F.44: Return a `T&` when copy is undesirable and “returning no object” isn’t needed
+- F.45: Don’t return a `T&&`
+- F.46: `int` is the return type for `main()`
+- F.47: Return `T&` from assignment operators
+- F.48: Don’t return `std::move(local)`
+- F.49: Don’t return `const T`
+
+Other function rules:
+
+- F.50: Use a lambda when a function won’t do (to capture local variables, or to write a local function)
+- F.51: Where there is a choice, prefer default arguments over overloading
+- F.52: Prefer capturing by reference in lambdas that will be used locally, including passed to algorithms
+- F.53: Avoid capturing by reference in lambdas that will be used non-locally, including returned, stored on the heap, or passed to another thread
+- F.54: When writing a lambda that captures `this` or any class data member, don’t use `[=]` default capture
+- F.55: Don’t use `va_arg` arguments
+- F.56: Avoid unnecessary condition nesting
+
+Functions have strong similarities to lambdas and function objects.
