@@ -22,13 +22,17 @@ comment: true
 
 # I.30: Encapsulate rule violations
 
->
+>封装违反了规则的代码。
 
 ## Reason
 
 To keep code simple and safe. Sometimes, ugly, unsafe, or error-prone techniques are necessary for logical or performance reasons. If so, keep them local, rather than “infecting” interfaces so that larger groups of programmers have to be aware of the subtleties. Implementation complexity should, if at all possible, not leak through interfaces into user code.
 
->保持代码简单和安全。有时，出于逻辑或性能原因，丑陋、不安全或容易出错的技术是必要的。如果是这样，保持它们在本地，而不是“感染”接口，这样更大的程序员群体必须意识到微妙之处。如果可能的话，实现复杂性不应该通过接口泄漏到用户代码中。
+>保持代码简单和安全。
+>
+>有时，出于逻辑或性能原因，丑陋、不安全或容易出错的技术是必要的。
+>
+>如果是这样，保持它们在本地，而不是“感染”接口。如果可能的话，实现复杂性不应该通过接口泄漏到用户代码中。
 
 ## Example
 
