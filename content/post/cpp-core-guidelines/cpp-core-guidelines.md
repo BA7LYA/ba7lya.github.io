@@ -126,9 +126,9 @@ Interface rule summary:
 - [I.06: Prefer `Expects()` for expressing preconditions]({{< ref "cpp-core-guidelines-i-06.md" >}})
 - [I.07: State postconditions]({{< ref "cpp-core-guidelines-i-07.md" >}})
 - [I.08: Prefer `Ensures()` for expressing postconditions]({{< ref "cpp-core-guidelines-i-08.md" >}})
-- I.09: If an interface is a template, document its parameters using concepts
-- I.10: Use exceptions to signal a failure to perform a required task
-- I.11: Never transfer ownership by a raw pointer (`T*`) or reference (`T&`)
+- [I.09: If an interface is a template, document its parameters using concepts]({{< ref "cpp-core-guidelines-i-09.md" >}})
+- [I.10: Use exceptions to signal a failure to perform a required task]({{< ref "cpp-core-guidelines-i-10.md" >}})
+- [I.11: Never transfer ownership by a raw pointer (`T*`) or reference (`T&`)]({{< ref "cpp-core-guidelines-i-11.md" >}})
 - I.12: Declare a pointer that must not be null as not_null
 - I.13: Do not pass an array as a single pointer
 - I.22: Avoid complex initialization of global objects
