@@ -151,11 +151,18 @@ struct Distance {
     int unit = 1;	// 1 means meters
 };
 
-Distance d1 = measure(obj1);        // access d1.value and d1.unit
-auto d2 = measure(obj2);            // access d2.value and d2.unit
-auto [value, unit] = measure(obj3); // access value and unit;
-                                    // somewhat redundant to people who know measure()
-auto [x, y] = measure(obj4);        // don't; it's likely to be confusing
+// access d1.value and d1.unit
+Distance d1 = measure(obj1);
+
+// access d2.value and d2.unit
+auto d2 = measure(obj2);
+
+// access value and unit;
+// somewhat redundant to people who know measure()
+auto [value, unit] = measure(obj3);
+
+// don't; it's likely to be confusing
+auto [x, y] = measure(obj4);
 ```
 
 The overly-generic `std::pair` and `std::tuple` should be used only when the value returned represents independent entities rather than an abstraction.
