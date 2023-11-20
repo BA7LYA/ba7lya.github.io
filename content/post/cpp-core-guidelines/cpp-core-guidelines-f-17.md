@@ -50,7 +50,7 @@ void increment_all(span<int> a) {
 }
 ```
 
-> 注：完成的demo？
+> 注：完整的demo？
 
 ## Note
 
