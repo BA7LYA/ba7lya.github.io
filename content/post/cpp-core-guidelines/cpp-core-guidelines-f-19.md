@@ -22,7 +22,7 @@ comment: true
 
 # F.19: For “forward” parameters, pass by `TP&&` and only `std::forward` the parameter
 
->对于需要转发的形参，不传递`TP&&`，只通过`std::forward`转发形参。
+>对于需要转发的形参，通过`TP&&`的形式进行传递，只通过`std::forward`转发参数，不进行其他操作。
 
 ## Reason
 
