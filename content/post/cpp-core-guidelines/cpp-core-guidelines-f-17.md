@@ -82,6 +82,8 @@ Here, the writer of `g()` is supplying a buffer for `f()` to fill, but `f()` sim
 
   - > 对函数引用非`const`形参时不写的函数发出警告。
 
+    > 注：查看是否有对应的`clang-tidy`检查项？
+
 - (Simple) ((Foundation)) Warn when a non-`const` parameter being passed by reference is `std::move`d.
 
   - >当引用传递的非`const`形参被`std::move`时发出警告。
