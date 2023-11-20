@@ -169,8 +169,8 @@ Function definition rules:
 
 Parameter passing expression rules:
 
-- F.15: Prefer simple and conventional ways of passing information
-- F.16: For “in” parameters, pass cheaply-copied types by value and others by reference to `const`
+- [F.15: Prefer simple and conventional ways of passing information]({{< ref "cpp-core-guidelines-f-15.md" >}})
+- [F.16: For “in” parameters, pass cheaply-copied types by value and others by reference to `const`]({{< ref "cpp-core-guidelines-f-16.md" >}})
 - F.17: For “in-out” parameters, pass by reference to non-`const`
 - F.18: For “will-move-from” parameters, pass by `X&&` and `std::move` the parameter
 - F.19: For “forward” parameters, pass by `TP&&` and only `std::forward` the parameter

@@ -32,7 +32,7 @@ Both let the caller know that a function will not modify the argument, and both 
 
 What is “cheap to copy” depends on the machine architecture, but two or three words (doubles, pointers, references) are usually best passed by value. When copying is cheap, nothing beats the simplicity and safety of copying, and for small objects (up to two or three words) it is also faster than passing by reference because it does not require an extra indirection to access from the function.
 
->什么是“低成本复制”取决于机器架构，但两或三个字（双精度，指针，引用）通常最好**按值传递**。当复制成本较低时，没有什么比复制的**简单性和安全性**更好，并且对于小对象（最多两或三个字），它也比通过引用传递更**快**，因为它不需要从函数访问额外的间接。
+>什么是“低成本复制”取决于机器架构，但两或三个字（双精度，指针，引用）通常最好**按值传递**。当复制成本较低时，没有什么比复制（按值传递）的**简单性和安全性**更好，并且对于小对象（最多两或三个字），它也比通过引用传递更**快**，因为它不需要从函数进行额外的间接访问。
 
 ## Example
 
@@ -87,11 +87,11 @@ A reference can be assumed to refer to a valid object (language rule). There is 
 
 - (Simple) ((Foundation)) Warn when a parameter being passed by value has a size greater than `2 * sizeof(void*)`. Suggest using a reference to `const` instead.
 
-  - >当值传递的参数的大小大于`2 * sizeof(void*)`时发出警告，建议使用`const &`替代。
+  - >当值传递的参数的大小≥`2 * sizeof(void*)`时发出警告，建议使用`const &`替代。
 
 - (Simple) ((Foundation)) Warn when a parameter passed by reference to `const` has a size less or equal than `2 * sizeof(void*)`. Suggest passing by value instead.
 
-  - >当`const &`传递的形参的`size<=2 * sizeof(void*)`时发出警告。建议按值传递。
+  - >当`const &`传递的形参的大小≤`2 * sizeof(void*)`时发出警告。建议按值传递。
 
 - (Simple) ((Foundation)) Warn when a parameter passed by reference to `const` is `move`d.
 
