@@ -30,7 +30,7 @@ A pointer (`T*`) can be a `nullptr` and a reference (`T&`) cannot, there is no v
 
 >指针（`T*`）可以是`nullptr`，而引用（`T&`）不能为空，没有合法的“空引用”。
 >
->有时使用`nullptr`作为指示的“no object”的替代方法是有用的，但如果不是，则引用在符号上更简单，并且可能产生更好的代码。
+>有时使用`nullptr`作为替代方法指示“空对象”是有用的，但如果不是，则引用在符号上更简单，并且可能产生更好的代码。
 
 ## Example
 
