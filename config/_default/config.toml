@@ -7,7 +7,7 @@ baseurl = "https://github.com/"  # Include trailing slash
 # title = "Clarity"
 # copyright = ""
 # canonifyurls = true
-paginate = 6
+paginate = 9
 theme = "hugo-clarity"
 disqusShortname = ""
 
