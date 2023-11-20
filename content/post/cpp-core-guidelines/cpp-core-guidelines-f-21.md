@@ -154,7 +154,7 @@ struct Distance {
 Distance d1 = measure(obj1);        // access d1.value and d1.unit
 auto d2 = measure(obj2);            // access d2.value and d2.unit
 auto [value, unit] = measure(obj3); // access value and unit;
-									// somewhat redundant to people who know measure()
+                                    // somewhat redundant to people who know measure()
 auto [x, y] = measure(obj4);        // don't; it's likely to be confusing
 ```
 
