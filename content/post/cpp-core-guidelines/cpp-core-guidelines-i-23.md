@@ -2,7 +2,7 @@
 title: "C++ Core Guidelines I.23 注解"
 date: 2023-11-19T02:39:11+08:00
 description: "C++ Core Guidelines I.23 注解"
-featured: true
+featured: false
 toc: true
 usePageBundles: false
 featureImage: "/images/cpp-core-guidelines.png"

@@ -2,7 +2,7 @@
 title: "{{ replace .Name "-" " " | title }}"
 date: {{ .Date }}
 description: "Article description."
-featured: true
+featured: false
 draft: true
 toc: true
 usePageBundles: false
