@@ -16,7 +16,7 @@ figurePositionShow: true
 categories:
   - C++
 tags:
-  - C++ Best Practice
+  - C++ Best Practices
   - C++ Core Guidelines
 comment: true
 ---
