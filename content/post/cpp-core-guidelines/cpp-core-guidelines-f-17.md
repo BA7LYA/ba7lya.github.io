@@ -22,7 +22,7 @@ comment: true
 
 # F.17: For “in-out” parameters, pass by reference to non-`const`
 
-> 对于"in-out"形参，通过引用传递给非`const`形参。
+> 对于"in-out"形参，通过非`const`的引用的方式（`X&`）传递。
 
 ## Reason
 
