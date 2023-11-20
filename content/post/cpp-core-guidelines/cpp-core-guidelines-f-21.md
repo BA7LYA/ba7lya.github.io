@@ -178,8 +178,7 @@ Another example, use a specific type along the lines of `std::variant<T, error_c
 When the `std::tuple` to be returned is initialized from local variables that are expensive to copy, explicit `move` may be helpful to avoid copying:
 
 ```c++
-std::pair<LargeObject, LargeObject> f(const std::string& input)
-{
+std::pair<LargeObject, LargeObject> f(const std::string& input) {
     LargeObject large1 = g(input);
     LargeObject large2 = h(input);
     // ...
@@ -190,8 +189,7 @@ std::pair<LargeObject, LargeObject> f(const std::string& input)
 Alternatively,
 
 ```c++
-std::pair<LargeObject, LargeObject> f(const std::string& input)
-{
+std::pair<LargeObject, LargeObject> f(const std::string& input) {
     // ...
     return { g(input), h(input) }; // no copies, no moves
 }

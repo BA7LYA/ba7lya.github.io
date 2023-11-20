@@ -176,7 +176,7 @@ Parameter passing expression rules:
 - [F.19: For “forward” parameters, pass by `TP&&` and only `std::forward` the parameter]({{< ref "cpp-core-guidelines-f-19.md" >}})
 - [F.20: For “out” output values, prefer return values to output parameters]({{< ref "cpp-core-guidelines-f-20.md" >}})
 - [F.21: To return multiple “out” values, prefer returning a struct or tuple]({{< ref "cpp-core-guidelines-f-21.md" >}})
-- F.60: Prefer `T*` over `T&` when “no argument” is a valid option
+- [F.60: Prefer `T*` over `T&` when “no argument” is a valid option]({{< ref "cpp-core-guidelines-f-.60md" >}})
 
 Parameter passing semantic rules:
 
