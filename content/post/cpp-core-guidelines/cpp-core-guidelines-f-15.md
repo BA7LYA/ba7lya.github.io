@@ -40,6 +40,8 @@ Advanced parameter passing:
 
 ![](/images/param-passing-advanced.png)
 
+> 注：参数传递，以这张图为参考基本就足够了。
+
 Use the advanced techniques only after demonstrating need, and document that need in a comment.
 
 For passing sequences of characters see String<sup>[2]</sup>.
