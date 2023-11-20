@@ -1,7 +1,7 @@
 ---
-title: "C++ Core Guidelines"
+title: "C++ Core Guidelines 注解"
 date: 2023-11-18T02:39:39+08:00
-description: "C++ Core Guidelines"
+description: "C++ Core Guidelines 注解"
 featured: true
 toc: true
 usePageBundles: false
