@@ -172,7 +172,7 @@ Parameter passing expression rules:
 - [F.15: Prefer simple and conventional ways of passing information]({{< ref "cpp-core-guidelines-f-15.md" >}})
 - [F.16: For “in” parameters, pass cheaply-copied types by value and others by reference to `const`]({{< ref "cpp-core-guidelines-f-16.md" >}})
 - [F.17: For “in-out” parameters, pass by reference to non-`const`]({{< ref "cpp-core-guidelines-f-17.md" >}})
-- F.18: For “will-move-from” parameters, pass by `X&&` and `std::move` the parameter
+- [F.18: For “will-move-from” parameters, pass by `X&&` and `std::move` the parameter]({{< ref "cpp-core-guidelines-f-18.md" >}})
 - F.19: For “forward” parameters, pass by `TP&&` and only `std::forward` the parameter
 - F.20: For “out” output values, prefer return values to output parameters
 - F.21: To return multiple “out” values, prefer returning a struct or tuple
