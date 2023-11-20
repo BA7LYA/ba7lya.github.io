@@ -11,6 +11,10 @@
   parent = "C++"
   name = "C++ Core Guidelines 注解"
   url = "post/cpp-core-guidelines/cpp-core-guidelines"
+[[main]]
+  parent = "C++"
+  name = "Clang-Tidy 检查规则注解"
+  url = "post/clang-tidy/clang-tidy"
 
 [[main]]
   name = "About"
