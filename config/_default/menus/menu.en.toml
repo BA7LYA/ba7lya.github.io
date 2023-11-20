@@ -4,11 +4,11 @@
   weight = -110
 
 [[main]]
-  name = "Series"
+  name = "C++"
   url = ""
   weight = -109
 [[main]]
-  parent = "Series"
+  parent = "C++"
   name = "C++ Core Guidelines 注解"
   url = "post/cpp-core-guidelines/cpp-core-guidelines"
 
