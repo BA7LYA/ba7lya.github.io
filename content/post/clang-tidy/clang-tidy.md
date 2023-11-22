@@ -182,7 +182,7 @@ All `NOLINTBEGIN` comments must be paired by an equal number of `NOLINTEND` comm
 
 ## Clang-Tidy Checks
 
-refer to [Clang-Tidy Checks]({{post/clang-tidy/clang-tidy-checks}}).
+refer to [Clang-Tidy Checks]({{< ref "clang-tidy-checks.md" >}}).
 
 ## Clang-Tidy IDE/Editor Integrations
 
