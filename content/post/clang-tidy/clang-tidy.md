@@ -179,3 +179,7 @@ lint-command:
 Note that whitespaces between `NOLINT`/`NOLINTNEXTLINE`/`NOLINTBEGIN`/`NOLINTEND` and the opening parenthesis are not allowed (in this case the comment will be treated just as `NOLINT`/`NOLINTNEXTLINE`/`NOLINTBEGIN`/`NOLINTEND`), whereas in the check names list (inside the parentheses), whitespaces can be used and will be ignored.
 
 All `NOLINTBEGIN` comments must be paired by an equal number of `NOLINTEND` comments. Moreover, a pair of comments must have matching arguments – for example, `NOLINTBEGIN(check-name)` can be paired with `NOLINTEND(check-name)` but not with `NOLINTEND` (zero arguments). clang-tidy will generate a `clang-tidy-nolint` error diagnostic if any `NOLINTBEGIN`/`NOLINTEND` comment violates these requirements.
+
+## Clang-Tidy Checks
+
+refer to [Clang-Tidy Checks]({{post/clang-tidy/clang-tidy-checks}}).
