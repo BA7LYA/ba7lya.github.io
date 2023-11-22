@@ -1,7 +1,7 @@
 ---
-title: "Clang-Tidy 检查规则注解"
+title: "Clang-Tidy的应用"
 date: 2023-11-21T02:56:25+08:00
-description: "Clang-Tidy 检查规则注解"
+description: "Clang-Tidy的应用"
 featured: true
 toc: true
 usePageBundles: false

@@ -13,7 +13,7 @@
   url = "post/cpp-core-guidelines/cpp-core-guidelines"
 [[main]]
   parent = "C++"
-  name = "Clang-Tidy 检查规则注解"
+  name = "Clang-Tidy的应用"
   url = "post/clang-tidy/clang-tidy"
 
 [[main]]
