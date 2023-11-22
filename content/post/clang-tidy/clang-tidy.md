@@ -244,7 +244,7 @@ For Vim, you can use Syntastic, which includes clang-tidy, or A.L.E., a lint eng
 
 #### Visual Studio Code
 
-在Visual Studio Code配置使用Clang-Tidy十分简单。
+在Visual Studio Code中配置使用Clang-Tidy十分简单。
 
 **STEP 01**
 
