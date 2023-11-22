@@ -9,12 +9,12 @@
   weight = -109
 [[main]]
   parent = "C++"
-  name = "C++ Core Guidelines 注解"
-  url = "post/cpp-core-guidelines/cpp-core-guidelines"
+  name = "Clang-Tidy"
+  url = "post/clang-tidy/clang-tidy"
 [[main]]
   parent = "C++"
-  name = "Clang-Tidy的应用"
-  url = "post/clang-tidy/clang-tidy"
+  name = "C++ Core Guidelines"
+  url = "post/cpp-core-guidelines/cpp-core-guidelines"
 
 [[main]]
   name = "About"

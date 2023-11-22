@@ -1,7 +1,7 @@
 ---
-title: "Clang-Tidy的应用"
+title: "Clang-Tidy"
 date: 2023-11-21T02:56:25+08:00
-description: "Clang-Tidy的应用"
+description: "Clang-Tidy"
 featured: true
 toc: true
 usePageBundles: false
