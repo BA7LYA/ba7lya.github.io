@@ -333,6 +333,64 @@ Note: Converting to an integer and back to an `absl::Duration` might be a trunca
 >
 >在极少数情况下，如果这是预期的结果，调用者应该使用`absl::Trunc`显式截断。
 
+## bugprone-*
+
+>
+
+### bugprone-exception-escape
+
+Finds functions which may throw an exception directly or indirectly, but they should not.
+
+>查找可能直接或间接抛出异常的函数，但它们不应该抛出异常。
+
+The functions which should not throw exceptions are the following:
+
+- Destructors
+- Move constructors
+- Move assignment operators
+- The `main()` functions
+- `swap()` functions
+- Functions marked with `throw()` or `noexcept`
+- Other functions given as option
+
+A destructor throwing an exception may result in undefined behavior, resource leaks or unexpected termination of the program. Throwing move constructor or move assignment also may result in undefined behavior or resource leak. The `swap()` operations expected to be non throwing most of the cases and they are always possible to implement in a non throwing way. Non throwing `swap()` operations are also used to create move operations. A throwing `main()` function also results in unexpected termination.
+
+>析构函数抛出异常可能导致未定义的行为、资源泄漏或程序的意外终止。
+>
+>抛出移动构造函数或移动赋值运算符也可能导致未定义行为或资源泄漏。
+>
+>`swap()`操作在大多数情况下都是非抛出的，并且它们总是可以以非抛出的方式实现。非抛出的`swap()`操作也用于创建移动操作。
+>
+>抛出`main()`函数也会导致意外终止。
+
+Functions declared explicitly with `noexcept(false)` or `throw(exception)` will be excluded from the analysis, as even though it is not recommended for functions like `swap()`, `main()`, move constructors, move assignment operators and destructors, it is a clear indication of the developer’s intention and should be respected.
+
+>用`noexcept(false)`或`throw(exception)`显式声明的函数将被排除在分析之外，因为即使不建议像`swap()`、`main()`、移动构造函数，移动赋值操作符和析构函数这样的函数抛出异常，这些显式声明也清楚地表明了开发人员的意图，应该得到尊重。
+
+WARNING! This check may be expensive on large source files.
+
+>警告！对于大型源文件，此检查可能代价高昂。（检查所需时间比较久）
+
+#### Options
+
+- `FunctionsThatShouldNotThrow`
+
+  - Comma separated list containing function names which should not throw. An example value for this parameter can be `WinMain` which adds function `WinMain()` in the Windows API to the list of the functions which should not throw. Default value is an empty string.
+
+  - >包含不应抛出的函数名的逗号分隔列表。
+    >
+    >这个参数的一个示例值可以是`WinMain`，它将Windows API中的函数`WinMain()`添加到不应该抛出的函数列表中。
+    >
+    >默认值为空字符串。
+
+- `IgnoredExceptions`
+
+  - Comma separated list containing type names which are not counted as thrown exceptions in the check. Default value is an empty string.
+
+  - >包含类型名的逗号分隔列表，这些类型名在检查中不被视为抛出异常。
+    >
+    >默认值为空字符串。
+
 ## concurrency-*
 
 ### concurrency-mt-unsafe
@@ -802,11 +860,292 @@ struct AClass
 
 This check implements [F.54](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#f54-when-writing-a-lambda-that-captures-this-or-any-class-data-member-dont-use--default-capture) from the C++ Core Guidelines.
 
+### cppcoreguidelines-owning-memory
+
+This check implements the type-based semantics of `gsl::owner<T*>`, which allows static analysis on code, that uses raw pointers to handle resources like dynamic memory, but won’t introduce RAII concepts.
+
+>这个检查实现了`gsl::owner<T*>`的基于类型的语义，它允许对代码进行静态分析，使用原始指针来处理像动态内存这样的资源，但不会引入RAII概念。
+
+This check implements [I.11](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#i11-never-transfer-ownership-by-a-raw-pointer-t-or-reference-t), [C.33](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c33-if-a-class-has-an-owning-pointer-member-define-a-destructor), [R.3](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#r3-a-raw-pointer-a-t-is-non-owning) and [GSL.Views](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-views) from the C++ Core Guidelines.
+
+The definition of a `gsl::owner<T*>` is straight forward:
+
+```c++
+namespace gsl {
+    template <typename T> owner = T;
+}
+```
+
+It is therefore simple to introduce the owner even without using an implementation of the [Guideline Support Library](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl).
+
+All checks are purely type based and not (yet) flow sensitive.
+
+>所有的检查都是纯粹基于类型的，对流程不敏感。
+
+The following examples will demonstrate the correct and incorrect initializations of owners, assignment is handled the same way. Note that both `new` and `malloc()`-like resource functions are considered to produce resources.
+
+>下面的示例将演示所有者的正确和错误初始化，分配的处理方式相同。
+>
+>请注意，`new`和`malloc()`类型的资源函数都被认为是生成资源。
+
+```c++
+// Creating an owner with factory functions is checked.
+gsl::owner<int*> function_that_returns_owner() {
+    return gsl::owner<int*>(new int(42));
+}
+
+// Dynamic memory must be assigned to an owner
+int* Something         = new int(42); // BAD, will be caught
+gsl::owner<int*> Owner = new int(42); // Good
+gsl::owner<int*> Owner = new int[42]; // Good as well
+
+// Returned owner must be assigned to an owner
+int* Something         = function_that_returns_owner(); // Bad, factory function
+gsl::owner<int*> Owner = function_that_returns_owner(); // Good, result lands in owner
+
+// Something not a resource or owner should not be assigned to owners
+int Stack = 42;
+gsl::owner<int*> Owned = &Stack; // Bad, not a resource assigned
+```
+
+In the case of dynamic memory as resource, only `gsl::owner<T*>` variables are allowed to be deleted.
+
+>在动态内存作为资源的情况下，只允许删除`gsl::owner<T*>`变量。
+
+```c++
+// Example Bad, non-owner as resource handle, will be caught.
+int* NonOwner = new int(42); // First warning here, since new must land in an owner
+delete NonOwner; // Second warning here, since only owners are allowed to be deleted
+
+// Example Good, Ownership correctly stated
+gsl::owner<int*> Owner = new int(42); // Good
+delete Owner; // Good as well, statically enforced, that only owners get deleted
+```
+
+The check will furthermore ensure, that functions, that expect a `gsl::owner<T*>` as argument get called with either a `gsl::owner<T*>` or a newly created resource.
+
+>该检查还将进一步确保以`gsl::owner<T*>`作为参数的函数被`gsl::owner<T*>`或新创建的资源调用。
+
+```c++
+void expects_owner(gsl::owner<int*> o) {
+    delete o;
+}
+
+// Bad Code
+int NonOwner = 42;
+expects_owner(&NonOwner); // Bad, will get caught
+
+// Good Code
+gsl::owner<int*> Owner = new int(42);
+expects_owner(Owner);       // Good
+expects_owner(new int(42)); // Good as well, recognized created resource
+
+// Port legacy code for better resource-safety
+gsl::owner<FILE*> File = fopen("my_file.txt", "rw+"); // Good
+FILE* BadFile = fopen("another_file.txt", "w");       // Bad, warned
+
+// ... use the file
+
+fclose(File);    // Ok, File is annotated as 'owner<>'
+fclose(BadFile); // Bad, BadFile is not an 'owner<>', will be warned
+```
+
+#### Options
+
+`LegacyResourceProducers`
+
+Semicolon-separated list of fully qualified names of legacy functions that create resources but cannot introduce `gsl::owner<>`.
+
+Defaults to `::malloc;::aligned_alloc;::realloc;::calloc;::fopen;::freopen;::tmpfile`.
+
+`LegacyResourceConsumers`
+
+Semicolon-separated list of fully qualified names of legacy functions expecting resource owners as pointer arguments but cannot introduce `gsl::owner<>`.
+
+Defaults to `::free;::realloc;::freopen;::fclose`.
+
+#### Limitations
+
+Using `gsl::owner<T*>` in a typedef or alias is not handled correctly.
+
+```c++
+using heap_int = gsl::owner<int*>;
+heap_int allocated = new int(42); // False positive!
+```
+
+The `gsl::owner<T*>` is declared as a templated type alias. In template functions and classes, like in the example below, the information of the type aliases gets lost. Therefore using `gsl::owner<T*>` in a heavy templated code base might lead to false positives.
+
+Known code constructs that do not get diagnosed correctly are:
+
+- `std::exchange`
+- `std::vector<gsl::owner<T*>>`
+
+```c++
+// This template function works as expected. Type information doesn't get lost.
+template <typename T>
+void delete_owner(gsl::owner<T*> owned_object) {
+  delete owned_object; // Everything alright
+}
+
+gsl::owner<int*> function_that_returns_owner() {
+    return gsl::owner<int*>(new int(42));
+}
+
+// Type deduction does not work for auto variables.
+// This is caught by the check and will be noted accordingly.
+auto OwnedObject = function_that_returns_owner(); // Type of OwnedObject will be 'int*'
+
+// Problematic function template that looses the typeinformation on owner
+template <typename T>
+void bad_template_function(T some_object) {
+  // This line will trigger the warning, that a non-owner is assigned to an owner
+  gsl::owner<T*> new_owner = some_object;
+}
+
+// Calling the function with an owner still yields a false positive.
+bad_template_function(gsl::owner<int*>(new int(42)));
+
+// The same issue occurs with templated classes like the following.
+template <typename T>
+class OwnedValue {
+public:
+  const T getValue() const {
+      return _val;
+  }
+private:
+  T _val;
+};
+
+// Code, that yields a false positive.
+OwnedValue<gsl::owner<int*>> Owner(new int(42)); // Type deduction yield T -> int *
+// False positive, getValue returns int* and not gsl::owner<int*>
+gsl::owner<int*> OwnedInt = Owner.getValue();
+```
+
+Another limitation of the current implementation is only the type based checking.
+
+Suppose you have code like the following:
+
+```c++
+// Two owners with assigned resources
+gsl::owner<int*> Owner1 = new int(42);
+gsl::owner<int*> Owner2 = new int(42);
+
+Owner2 = Owner1; // Conceptual Leak of initial resource of Owner2!
+Owner1 = nullptr;
+```
+
+The semantic of a `gsl::owner<T*>` is mostly like a `std::unique_ptr<T>`, therefore assignment of two `gsl::owner<T*>` is considered a move, which requires that the resource `Owner2` must have been released before the assignment. This kind of condition could be caught in later improvements of this check with flowsensitive analysis. Currently, the Clang Static Analyzer catches this bug for dynamic memory, but not for general types of resources.
+
+>`gsl::owner<T*>`的语义很像`std::unique_ptr<T>`，因此两个`gsl::owner<T*>`的赋值被认为是一次移动，这要求资源`Owner2`必须在赋值之前被释放。这种情况可以在以后用流量敏感分析改进。目前，Clang静态分析器可以捕获动态内存的这个错误，但不能捕获一般类型的资源。
+
+>注：还是用`std::unique_ptr<T>`吧。
+
+## google-*
+
+>
+
+### google-readability-todo
+
+Finds TODO comments without a username or bug number.
+
+>查找没有用户名或bug号的TODO注释。
+
+The relevant style guide section is https://google.github.io/styleguide/cppguide.html#TODO_Comments.
+
+Corresponding cpplint.py check: readability/todo
+
 ## modernize-*
 
 Checks that advocate usage of modern (currently “modern” means “C++11”) language constructs.
 
 >支持使用现代（目前“现代”指的是“C++ 11”及以后版本）语言结构的检查。
+
+### modernize-avoid-c-arrays
+
+cppcoreguidelines-avoid-c-arrays redirects here as an alias for this check.
+
+hicpp-avoid-c-arrays redirects here as an alias for this check.
+
+Finds C-style array types and recommend to use `std::array<>` / `std::vector<>`. All types of C arrays are diagnosed.
+
+However, fix-it are potentially dangerous in header files and are therefore **not emitted** right now.
+
+```c++
+int a[] = {1, 2};	// warning: do not declare C-style arrays, use std::array<> instead
+int b[1];			// warning: do not declare C-style arrays, use std::array<> instead
+
+void foo() {
+  int c[b[0]]; // warning: do not declare C VLA arrays, use std::vector<> instead
+}
+
+template <typename T, int Size>
+class array {
+  T d[Size];	// warning: do not declare C-style arrays, use std::array<> instead
+  int e[1];		// warning: do not declare C-style arrays, use std::array<> instead
+};
+
+std::array<int[4], 2> d;	// warning: do not declare C-style arrays, use std::array<> instead
+using k = int[4];			// warning: do not declare C-style arrays, use std::array<> instead
+```
+
+However, the `extern "C"` code is ignored, since it is common to share such headers between C code, and C++ code.
+
+```c++
+// Some header
+extern "C" {
+
+int f[] = {1, 2}; // not diagnosed
+
+int j[1]; // not diagnosed
+
+inline void bar() {
+  {
+    int j[j[0]]; // not diagnosed
+  }
+}
+
+}
+```
+
+Similarly, the `main()` function is ignored. Its second and third parameters can be either `char* argv[]` or `char** argv`, but cannot be `std::array<>`.
+
+### modernize-return-braced-init-list
+
+Replaces explicit calls to the constructor in a return with a braced initializer list. This way the return type is not needlessly duplicated in the function definition and the return statement.
+
+>用带括号的初始化列表替换返回函数中对构造函数的显式调用。这样，返回类型就不会在函数定义和返回语句中不必要地重复。
+
+```c++
+Foo bar() {
+  Baz baz;
+  return Foo(baz);
+}
+
+// transforms to:
+
+Foo bar() {
+  Baz baz;
+  return {baz};
+}
+```
+
+### modernize-use-equals-default
+
+This check replaces default bodies of special member functions with `= default;`. The explicitly defaulted function declarations enable more opportunities in optimization, because the compiler might treat explicitly defaulted functions as trivial.
+
+>这个检查用`= default;`代替特殊成员函数的默认体。
+>
+>显式默认的函数声明为优化提供了更多的机会，因为编译器可能会将显式默认的函数视为trivial。
+
+Note: Move-constructor and move-assignment operator are not supported yet.
+
+#### Options
+
+- `IgnoreMacros`
+  - If set to `true`, the check will not give warnings inside macros and will ignore special members with bodies contain macros or preprocessor directives.
+    - 如果设置为`true`，检查将不会在宏中给出警告，并且会忽略主体中包含宏或预处理器指令的特殊成员。
+  - Default is `true`.
 
 ### modernize-use-trailing-return-type
 
@@ -875,6 +1214,165 @@ This code fails to compile because the `S` in the context of f refers to the equ
 >这段代码无法编译，因为`f`上下文中的`S`引用了同名的函数参数。类似地，`m`上下文中的`S`指的是同名的类成员。
 >
 >该检查目前只能检测并避免与函数参数名冲突。
+
+## readability-*
+
+>
+
+### readability-convert-member-functions-to-static
+
+Finds non-static member functions that can be made `static` because the functions don’t use `this`.
+
+>查找可以设置为`static`的非静态成员函数，因为这些函数不使用`this`。
+
+After applying modifications as suggested by the check, running the check again might find more opportunities to mark member functions `static`.
+
+>在按照检查建议应用修改后，再次运行检查可能会发现更多将成员函数标记为`static`的机会。
+
+After making a member function `static`, you might want to run the check `readability-static-accessed-through-instance` to replace calls like `Instance.method()` by `Class::method()`.
+
+>在将成员函数设置为`static`之后，您可能需要运行检查`readable -static-accessed-through-instance`，以`Class::method()`取代`Instance.method()`之类的调用。
+
+### readability-named-parameter
+
+Find functions with unnamed arguments.
+
+>查找带有未命名参数的函数。
+
+The check implements the following rule originating in the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html#Function_Declarations_and_Definitions).
+
+All parameters should be named, with identical names in the declaration and implementation.
+
+>所有参数都应该命名，在声明和实现中使用相同的名称。
+
+Corresponding cpplint.py check name: readability/function.
+
+### readability-qualified-auto
+
+Adds pointer qualifications to `auto`-typed variables that are deduced to pointers.
+
+>将指针限定条件添加到演绎为指针的`auto`类型变量。
+
+[LLVM Coding Standards](https://llvm.org/docs/CodingStandards.html#beware-unnecessary-copies-with-auto) advises to make it obvious if a `auto` typed variable is a pointer.
+
+This check will transform `auto` to `auto *` when the type is deduced to be a pointer.
+
+>当类型被推断为指针时，此检查将把`auto`转换为`auto *`。
+
+```c++
+for (auto Data : MutatablePtrContainer) {
+  change(*Data);
+}
+
+for (auto Data : ConstantPtrContainer) {
+  observe(*Data);
+}
+```
+
+Would be transformed into:
+
+```c++
+for (auto *Data : MutatablePtrContainer) {
+  change(*Data);
+}
+
+for (const auto *Data : ConstantPtrContainer) {
+  observe(*Data);
+}
+```
+
+Note `const` `volatile` qualified types will retain their `const` and `volatile` qualifiers. Pointers to pointers will not be fully qualified.
+
+>注意`const` `volatile`限定类型将保留它们的`const`和`volatile`限定符。
+>
+>指向指针的指针将不是完全限定的。
+
+```c++
+   const auto Foo    = cast<int *>      (Baz1);
+   const auto Bar    = cast<const int *>(Baz2);
+volatile auto FooBar = cast<int *>      (Baz3);
+         auto BarFoo = cast<int **>     (Baz4);
+```
+
+Would be transformed into:
+
+```c++
+      auto *const    Foo    = cast<int *>      (Baz1);
+const auto *const    Bar    = cast<const int *>(Baz2);
+      auto *volatile FooBar = cast<int *>      (Baz3);
+      auto *         BarFoo = cast<int **>     (Baz4);
+```
+
+#### Options
+
+`AddConstToQualified`
+
+When set to `true`, the check will add `const` qualifiers variables defined as `auto *` or `auto &` when applicable.
+
+Default value is `true`.
+
+>当设置为`true`时，检查将为`auto *`或`auto &`变量添加`const`限定符。
+>
+>默认值为`true`。
+
+```c++
+auto  Foo1 = cast<const int *>(Bar1);
+auto *Foo2 = cast<const int *>(Bar2);
+auto &Foo3 = cast<const int &>(Bar3);
+```
+
+If `AddConstToQualified` is set to `false`, it will be transformed into:
+
+```c++
+const auto *Foo1 = cast<const int *>(Bar1);
+      auto *Foo2 = cast<const int *>(Bar2);
+      auto &Foo3 = cast<const int &>(Bar3);
+```
+
+Otherwise it will be transformed into:
+
+```c++
+const auto *Foo1 = cast<const int *>(Bar1);
+const auto *Foo2 = cast<const int *>(Bar2);
+const auto &Foo3 = cast<const int &>(Bar3);
+```
+
+Note in the LLVM alias, the default value is `false`.
+
+### readability-static-accessed-through-instance
+
+Checks for member expressions that access static members through instances, and replaces them with uses of the appropriate qualified-id.
+
+>检查通过实例访问静态成员的成员表达式，并用适当的限定id替换它们。
+
+Example:
+
+The following code:
+
+```c++
+struct C {
+    static void foo();
+    static int x;
+    enum { E1 };
+    enum E { E2 };
+};
+
+C *c1 = new C();
+c1->foo();
+c1->x;
+c1->E1;
+c1->E2;
+```
+
+is changed to:
+
+```c++
+C *c1 = new C();
+C::foo();
+C::x;
+C::E1;
+C::E2;
+```
 
 ## Reference
 
