@@ -802,6 +802,80 @@ struct AClass
 
 This check implements [F.54](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#f54-when-writing-a-lambda-that-captures-this-or-any-class-data-member-dont-use--default-capture) from the C++ Core Guidelines.
 
+## modernize-*
+
+Checks that advocate usage of modern (currently “modern” means “C++11”) language constructs.
+
+>支持使用现代（目前“现代”指的是“C++ 11”及以后版本）语言结构的检查。
+
+### modernize-use-trailing-return-type
+
+Rewrites function signatures to use a trailing return type (introduced in C++11). This transformation is purely stylistic. The return type before the function name is replaced by auto and inserted after the function parameter list (and qualifiers).
+
+>重写函数签名以使用尾随返回类型（在C++ 11中引入）。
+>
+>这种转变纯粹是格式上的。函数名之前的返回类型被`auto`替换，并插入到函数参数列表（和限定符）之后。
+
+Example
+
+```c++
+int f1();
+inline int f2(int arg) noexcept;
+virtual float f3() const && = delete;
+```
+
+transforms to:
+
+```c++
+auto f1() -> int;
+inline auto f2(int arg) -> int noexcept;
+virtual auto f3() const && -> float = delete;
+```
+
+#### Known Limitations
+
+The following categories of return types cannot be rewritten currently:
+
+- function pointers
+- member function pointers
+- member pointers
+
+Unqualified names in the return type might erroneously refer to different entities after the rewrite. Preventing such errors requires a full lookup of all unqualified names present in the return type in the scope of the trailing return type location. This location includes e.g. function parameter names and members of the enclosing class (including all inherited classes). Such a lookup is currently not implemented.
+
+>在重写之后，返回类型中的非限定名可能会错误地引用不同的实体。
+>
+>要防止此类错误，需要在返回类型的末尾返回类型位置的作用域中完整查找返回类型中出现的所有非限定名。这个位置包括函数参数名和外围类的成员（包括所有继承类）。目前还没有实现这样的查找。
+
+Given the following piece of code
+
+```c++
+struct S { long long value; };
+S f(unsigned S) { return {S * 2}; }
+class CC {
+  int S;
+  struct S m();
+};
+S CC::m() { return {0}; }
+```
+
+a careless rewrite would produce the following output:
+
+```c++
+struct S { long long value; };
+auto f(unsigned S) -> S { return {S * 2}; } // error
+class CC {
+  int S;
+  auto m() -> struct S;
+};
+auto CC::m() -> S { return {0}; } // error
+```
+
+This code fails to compile because the `S` in the context of f refers to the equally named function parameter. Similarly, the S in the context of m refers to the equally named class member. The check can currently only detect and avoid a clash with a function parameter name.
+
+>这段代码无法编译，因为`f`上下文中的`S`引用了同名的函数参数。类似地，`m`上下文中的`S`指的是同名的类成员。
+>
+>该检查目前只能检测并避免与函数参数名冲突。
+
 ## Reference
 
 [1] [Clang-Tidy Checks](https://clang.llvm.org/extra/clang-tidy/checks/list.html)
