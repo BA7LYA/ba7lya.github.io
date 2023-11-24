@@ -1253,6 +1253,30 @@ Checks related to the LLVM coding conventions.
 
 Checks that we didn’t have a better category for.
 
+### misc-non-private-member-variables-in-classes
+
+cppcoreguidelines-non-private-member-variables-in-classes redirects here as an alias for this check.
+
+Finds classes that contain non-static data members in addition to user-declared non-static member functions and diagnose all data members declared with a non-public access specifier. The data members should be declared as private and accessed through member functions instead of exposed to derived classes or class consumers.
+
+>查找除了用户声明的非静态成员函数之外还包含非静态数据成员的类，并诊断使用非公共访问说明符声明的所有数据成员。
+>
+>数据成员应该声明为私有并通过成员函数访问，而不是公开给派生类或类消费者。
+
+#### Options
+
+`IgnoreClassesWithAllMemberVariablesBeingPublic`
+
+Allows to completely ignore classes if all the member variables in that class a declared with a public access specifier.
+
+>如果类中的所有成员变量都是用公共访问说明符声明的，则允许完全忽略该类。
+
+`IgnorePublicMemberVariables`
+
+Allows to ignore (not diagnose) all the member variables declared with a public access specifier.
+
+>允许忽略（而不是诊断）使用公共访问说明符声明的所有成员变量。
+
 ## modernize-*
 
 Checks that advocate usage of modern (currently “modern” means “C++11”) language constructs.
