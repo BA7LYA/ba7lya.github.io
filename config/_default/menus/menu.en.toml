@@ -1,33 +1,36 @@
 [[main]]
-  name = "Home"
-  url = ""
-  weight = -110
+name = "Home"
+url = ""
+weight = -110
 
 [[main]]
-  name = "C++"
-  url = ""
-  weight = -109
-[[main]]
-  parent = "C++"
-  name = "Clang-Tidy"
-  url = "post/clang-tidy/clang-tidy"
-[[main]]
-  parent = "C++"
-  name = "C++ Core Guidelines"
-  url = "post/cpp-core-guidelines/cpp-core-guidelines"
+name = "C++"
+url = ""
+weight = -109
 
 [[main]]
-  name = "About"
-  url = "about/"
-  weight = -108
+parent = "C++"
+name = "Clang-Tidy"
+url = "post/clang-tidy/clang-tidy"
+
+[[main]]
+parent = "C++"
+name = "C++ Core Guidelines"
+url = "post/cpp-core-guidelines/cpp-core-guidelines"
+
+[[main]]
+name = "About"
+url = "about/"
+weight = -108
 
 [[social]]
-  name = "github"
-  type = "social"
-  weight = 1
-  url = "https://github.com/ba7lya"
+name = "github"
+type = "social"
+weight = 1
+url = "https://github.com/ba7lya"
+
 [[social]]
-  name = "rss"
-  type = "social"
-  weight = 4
-  url = "index.xml"
+name = "rss"
+type = "social"
+weight = 4
+url = "index.xml"
