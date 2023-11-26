@@ -1783,6 +1783,2201 @@ In this example, `foo()` is called with `ptr_ptr` as its argument. However, `ptr
 
 Using an explicit cast is a recommended solution to prevent issues caused by implicit pointer level conversion, as it allows the developer to explicitly state their intention and show their reasoning for the type conversion. Additionally, it is recommended that developers thoroughly check and verify the safety of the conversion before using an explicit cast. This extra level of caution can help catch potential issues early on in the development process, improving the overall reliability and maintainability of the code.
 
+### bugprone-multiple-new-in-one-expression
+
+Finds multiple `new` operator calls in a single expression, where the allocated memory by the first `new` may leak if the second allocation fails and throws exception.
+
+C++ does often not specify the exact order of evaluation of the operands of an operator or arguments of a function. Therefore if a first allocation succeeds and a second fails, in an exception handler it is not possible to tell which allocation has failed and free the memory. Even if the order is fixed the result of a first `new` may be stored in a temporary location that is not reachable at the time when a second allocation fails. It is best to avoid any expression that contains more than one `operator new` call, if exception handling is used to check for allocation errors.
+
+Different rules apply for are the short-circuit operators `||` and `&&` and the `,` operator, where evaluation of one side must be completed before the other starts. Expressions of a list-initialization (initialization or construction using `{` and `}` characters) are evaluated in fixed order. Similarly, condition of a `?` operator is evaluated before the branches are evaluated.
+
+The check reports warning if two `new` calls appear in one expression at different sides of an operator, or if `new` calls appear in different arguments of a function call (that can be an object construction with `()` syntax). These `new` calls can be nested at any level. For any warning to be emitted the `new` calls should be in a code block where exception handling is used with catch for `std::bad_alloc` or `std::exception`. At `||`, `&&`, `,`, `?` (condition and one branch) operators no warning is emitted. No warning is emitted if both of the memory allocations are not assigned to a variable or not passed directly to a function. The reason is that in this case the memory may be intentionally not freed or the allocated objects can be self-destructing objects.
+
+Examples:
+
+```
+struct A {
+  int Var;
+};
+struct B {
+  B();
+  B(A *);
+  int Var;
+};
+struct C {
+  int *X1;
+  int *X2;
+};
+
+void f(A *, B *);
+int f1(A *);
+int f1(B *);
+bool f2(A *);
+
+void foo() {
+  A *PtrA;
+  B *PtrB;
+  try {
+    // Allocation of 'B'/'A' may fail after memory for 'A'/'B' was allocated.
+    f(new A, new B); // warning: memory allocation may leak if an other allocation is sequenced after it and throws an exception; order of these allocations is undefined
+
+    // List (aggregate) initialization is used.
+    C C1{new int, new int}; // no warning
+
+    // Allocation of 'B'/'A' may fail after memory for 'A'/'B' was allocated but not yet passed to function 'f1'.
+    int X = f1(new A) + f1(new B); // warning: memory allocation may leak if an other allocation is sequenced after it and throws an exception; order of these allocations is undefined
+
+    // Allocation of 'B' may fail after memory for 'A' was allocated.
+    // From C++17 on memory for 'B' is allocated first but still may leak if allocation of 'A' fails.
+    PtrB = new B(new A); // warning: memory allocation may leak if an other allocation is sequenced after it and throws an exception
+
+    // 'new A' and 'new B' may be performed in any order.
+    // 'new B'/'new A' may fail after memory for 'A'/'B' was allocated but not assigned to 'PtrA'/'PtrB'.
+    (PtrA = new A)->Var = (PtrB = new B)->Var; // warning: memory allocation may leak if an other allocation is sequenced after it and throws an exception; order of these allocations is undefined
+
+    // Evaluation of 'f2(new A)' must be finished before 'f1(new B)' starts.
+    // If 'new B' fails the allocated memory for 'A' is supposedly handled correctly because function 'f2' could take the ownership.
+    bool Z = f2(new A) || f1(new B); // no warning
+
+    X = (f2(new A) ? f1(new A) : f1(new B)); // no warning
+
+    // No warning if the result of both allocations is not passed to a function
+    // or stored in a variable.
+    (new A)->Var = (new B)->Var; // no warning
+
+    // No warning if at least one non-throwing allocation is used.
+    f(new(std::nothrow) A, new B); // no warning
+  } catch(std::bad_alloc) {
+  }
+
+  // No warning if the allocation is outside a try block (or no catch handler exists for std::bad_alloc).
+  // (The fact if exceptions can escape from 'foo' is not taken into account.)
+  f(new A, new B); // no warning
+}
+```
+
+### bugprone-multiple-statement-macro
+
+Detect multiple statement macros that are used in unbraced conditionals. Only the first statement of the macro will be inside the conditional and the other ones will be executed unconditionally.
+
+Example:
+
+```
+#define INCREMENT_TWO(x, y) (x)++; (y)++
+if (do_increment)
+  INCREMENT_TWO(a, b);  // (b)++ will be executed unconditionally.
+```
+
+### bugprone-no-escape
+
+Finds pointers with the `noescape` attribute that are captured by an asynchronously-executed block. The block arguments in `dispatch_async()` and `dispatch_after()` are guaranteed to escape, so it is an error if a pointer with the `noescape` attribute is captured by one of these blocks.
+
+The following is an example of an invalid use of the `noescape` attribute.
+
+```
+void foo(__attribute__((noescape)) int *p) {
+  dispatch_async(queue, ^{
+    *p = 123;
+  });
+});
+```
+
+### bugprone-non-zero-enum-to-bool-conversion
+
+Detect implicit and explicit casts of `enum` type into `bool` where `enum` type doesn’t have a zero-value enumerator. If the `enum` is used only to hold values equal to its enumerators, then conversion to `bool` will always result in `true` value. This can lead to unnecessary code that reduces readability and maintainability and can result in bugs.
+
+May produce false positives if the `enum` is used to store other values (used as a bit-mask or zero-initialized on purpose). To deal with them, `// NOLINT` or casting first to the underlying type before casting to `bool` can be used.
+
+It is important to note that this check will not generate warnings if the definition of the enumeration type is not available. Additionally, C++11 enumeration classes are supported by this check.
+
+Overall, this check serves to improve code quality and readability by identifying and flagging instances where implicit or explicit casts from enumeration types to boolean could cause potential issues.
+
+#### Example
+
+```
+enum EStatus {
+  OK = 1,
+  NOT_OK,
+  UNKNOWN
+};
+
+void process(EStatus status) {
+  if (!status) {
+    // this true-branch won't be executed
+    return;
+  }
+  // proceed with "valid data"
+}
+```
+
+#### Options
+
+##### `EnumIgnoreList`
+
+Option is used to ignore certain enum types when checking for implicit/explicit casts to bool. It accepts a semicolon-separated list of (fully qualified) enum type names or regular expressions that match the enum type names. The default value is an empty string, which means no enums will be ignored.
+
+### bugprone-not-null-terminated-result
+
+Finds function calls where it is possible to cause a not null-terminated result. Usually the proper length of a string is `strlen(src) + 1` or equal length of this expression, because the null terminator needs an extra space. Without the null terminator it can result in undefined behavior when the string is read.
+
+The following and their respective `wchar_t` based functions are checked:
+
+```
+memcpy`, `memcpy_s`, `memchr`, `memmove`, `memmove_s`, `strerror_s`, `strncmp`, `strxfrm
+```
+
+The following is a real-world example where the programmer forgot to increase the passed third argument, which is `size_t length`. That is why the length of the allocated memory is not enough to hold the null terminator.
+
+```
+static char *stringCpy(const std::string &str) {
+  char *result = reinterpret_cast<char *>(malloc(str.size()));
+  memcpy(result, str.data(), str.size());
+  return result;
+}
+```
+
+In addition to issuing warnings, fix-it rewrites all the necessary code. It also tries to adjust the capacity of the destination array:
+
+```
+static char *stringCpy(const std::string &str) {
+  char *result = reinterpret_cast<char *>(malloc(str.size() + 1));
+  strcpy(result, str.data());
+  return result;
+}
+```
+
+Note: It cannot guarantee to rewrite every of the path-sensitive memory allocations.
+
+#### Transformation rules of ‘memcpy()’
+
+It is possible to rewrite the `memcpy()` and `memcpy_s()` calls as the following four functions: `strcpy()`, `strncpy()`, `strcpy_s()`, `strncpy_s()`, where the latter two are the safer versions of the former two. It rewrites the `wchar_t` based memory handler functions respectively.
+
+##### Rewrite based on the destination array
+
+- If copy to the destination array cannot overflow [1] the new function should be the older copy function (ending with `cpy`), because it is more efficient than the safe version.
+- If copy to the destination array can overflow [1] and [`WantToUseSafeFunctions`](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/not-null-terminated-result.html#cmdoption-arg-WantToUseSafeFunctions) is set to true and it is possible to obtain the capacity of the destination array then the new function could be the safe version (ending with `cpy_s`).
+- If the new function is could be safe version and C++ files are analyzed and the destination array is plain `char`/`wchar_t` without `un/signed` then the length of the destination array can be omitted.
+- If the new function is could be safe version and the destination array is `un/signed` it needs to be casted to plain `char *`/`wchar_t *`.
+
+- [1] It is possible to overflow:
+
+  If the capacity of the destination array is unknown.If the given length is equal to the destination array’s capacity.
+
+##### Rewrite based on the length of the source string
+
+- If the given length is `strlen(source)` or equal length of this expression then the new function should be the older copy function (ending with `cpy`), as it is more efficient than the safe version (ending with `cpy_s`).
+- Otherwise we assume that the programmer wanted to copy ‘N’ characters, so the new function is `ncpy`-like which copies ‘N’ characters.
+
+#### Transformations with ‘strlen()’ or equal length of this expression
+
+It transforms the `wchar_t` based memory and string handler functions respectively (where only `strerror_s` does not have `wchar_t` based alias).
+
+##### Memory handler functions
+
+`memcpy` Please visit the [Transformation rules of ‘memcpy()’](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/not-null-terminated-result.html#memcpytransformation) section.
+
+`memchr` Usually there is a C-style cast and it is needed to be removed, because the new function `strchr`’s return type is correct. The given length is going to be removed.
+
+`memmove` If safe functions are available the new function is `memmove_s`, which has a new second argument which is the length of the destination array, it is adjusted, and the length of the source string is incremented by one. If safe functions are not available the given length is incremented by one.
+
+`memmove_s` The given length is incremented by one.
+
+##### String handler functions
+
+`strerror_s` The given length is incremented by one.
+
+`strncmp` If the third argument is the first or the second argument’s `length + 1` it has to be truncated without the `+ 1` operation.
+
+`strxfrm` The given length is incremented by one.
+
+#### Options
+
+##### `WantToUseSafeFunctions`
+
+The value true specifies that the target environment is considered to implement ‘_s’ suffixed memory and string handler functions which are safer than older versions (e.g. ‘memcpy_s()’). The default value is true.
+
+### bugprone-optional-value-conversion
+
+Detects potentially unintentional and redundant conversions where a value is extracted from an optional-like type and then used to create a new instance of the same optional-like type.
+
+These conversions might be the result of developer oversight, leftovers from code refactoring, or other situations that could lead to unintended exceptions or cases where the resulting optional is always initialized, which might be unexpected behavior.
+
+To illustrate, consider the following problematic code snippet:
+
+```
+#include <optional>
+
+void print(std::optional<int>);
+
+int main()
+{
+  std::optional<int> opt;
+  // ...
+
+  // Unintentional conversion from std::optional<int> to int and back to
+  // std::optional<int>:
+  print(opt.value());
+
+  // ...
+}
+```
+
+A better approach would be to directly pass `opt` to the `print` function without extracting its value:
+
+```
+#include <optional>
+
+void print(std::optional<int>);
+
+int main()
+{
+  std::optional<int> opt;
+  // ...
+
+  // Proposed code: Directly pass the std::optional<int> to the print
+  // function.
+  print(opt);
+
+  // ...
+}
+```
+
+By passing `opt` directly to the print function, unnecessary conversions are avoided, and potential unintended behavior or exceptions are minimized.
+
+Value extraction using `operator *` is matched by default. The support for non-standard optional types such as `boost::optional` or `absl::optional` may be limited.
+
+#### Options
+
+##### `OptionalTypes`
+
+Semicolon-separated list of (fully qualified) optional type names or regular expressions that match the optional types.
+
+Default value is ::std::optional;::absl::optional;::boost::optional.
+
+##### `ValueMethods`
+
+Semicolon-separated list of (fully qualified) method names or regular expressions that match the methods.
+
+Default value is `::value$`;`::get$`.
+
+### bugprone-posix-return
+
+Checks if any calls to `pthread_*` or `posix_*` functions (except `posix_openpt`) expect negative return values. These functions return either `0` on success or an `errno` on failure, which is positive only.
+
+Example buggy usage looks like:
+
+```
+if (posix_fadvise(...) < 0) {
+```
+
+This will never happen as the return value is always non-negative. A simple fix could be:
+
+```
+if (posix_fadvise(...) > 0) {
+```
+
+### bugprone-redundant-branch-condition
+
+Finds condition variables in nested `if` statements that were also checked in the outer `if` statement and were not changed.
+
+Simple example:
+
+```
+bool onFire = isBurning();
+if (onFire) {
+  if (onFire)
+    scream();
+}
+```
+
+Here onFire is checked both in the outer `if` and the inner `if` statement without a possible change between the two checks. The check warns for this code and suggests removal of the second checking of variable onFire.
+
+The checker also detects redundant condition checks if the condition variable is an operand of a logical “and” (`&&`) or a logical “or” (`||`) operator:
+
+```
+bool onFire = isBurning();
+if (onFire) {
+  if (onFire && peopleInTheBuilding > 0)
+    scream();
+}
+bool onFire = isBurning();
+if (onFire) {
+  if (onFire || isCollapsing())
+    scream();
+}
+```
+
+In the first case (logical “and”) the suggested fix is to remove the redundant condition variable and keep the other side of the `&&`. In the second case (logical “or”) the whole `if` is removed similarly to the simple case on the top.
+
+The condition of the outer `if` statement may also be a logical “and” (`&&`) expression:
+
+```
+bool onFire = isBurning();
+if (onFire && fireFighters < 10) {
+  if (someOtherCondition()) {
+    if (onFire)
+      scream();
+  }
+}
+```
+
+The error is also detected if both the outer statement is a logical “and” (`&&`) and the inner statement is a logical “and” (`&&`) or “or” (`||`). The inner `if` statement does not have to be a direct descendant of the outer one.
+
+No error is detected if the condition variable may have been changed between the two checks:
+
+```
+bool onFire = isBurning();
+if (onFire) {
+  tryToExtinguish(onFire);
+  if (onFire && peopleInTheBuilding > 0)
+    scream();
+}
+```
+
+Every possible change is considered, thus if the condition variable is not a local variable of the function, it is a volatile or it has an alias (pointer or reference) then no warning is issued.
+
+#### Known limitations
+
+The `else` branch is not checked currently for negated condition variable:
+
+```
+bool onFire = isBurning();
+if (onFire) {
+  scream();
+} else {
+  if (!onFire) {
+    continueWork();
+  }
+}
+```
+
+The checker currently only detects redundant checking of single condition variables.
+
+More complex expressions are not checked:
+
+```
+if (peopleInTheBuilding == 1) {
+  if (peopleInTheBuilding == 1) {
+    doSomething();
+  }
+}
+```
+
+### bugprone-reserved-identifier
+
+cert-dcl37-c and cert-dcl51-cpp redirect here as an alias for this check.
+
+Checks for usages of identifiers reserved for use by the implementation.
+
+The C and C++ standards both reserve the following names for such use:
+
+- identifiers that begin with an underscore followed by an uppercase letter;
+- identifiers in the global namespace that begin with an underscore.
+
+The C standard additionally reserves names beginning with a double underscore, while the C++ standard strengthens this to reserve names with a double underscore occurring anywhere.
+
+Violating the naming rules above results in undefined behavior.
+
+```
+namespace NS {
+  void __f(); // name is not allowed in user code
+  using _Int = int; // same with this
+  #define cool__macro // also this
+}
+int _g(); // disallowed in global namespace only
+```
+
+The check can also be inverted, i.e. it can be configured to flag any identifier that is _not_ a reserved identifier. This mode is for use by e.g. standard library implementors, to ensure they don’t infringe on the user namespace.
+
+This check does not (yet) check for other reserved names, e.g. macro names identical to language keywords, and names specifically reserved by language standards, e.g. C++ ‘zombie names’ and C future library directions.
+
+This check corresponds to CERT C Coding Standard rule [DCL37-C. Do not declare or define a reserved identifier](https://wiki.sei.cmu.edu/confluence/display/c/DCL37-C.+Do+not+declare+or+define+a+reserved+identifier) as well as its C++ counterpart, [DCL51-CPP. Do not declare or define a reserved identifier](https://wiki.sei.cmu.edu/confluence/display/cplusplus/DCL51-CPP.+Do+not+declare+or+define+a+reserved+identifier).
+
+#### Options
+
+##### `Invert`
+
+If true, inverts the check, i.e. flags names that are not reserved.
+
+Default is false.
+
+##### `AllowedIdentifiers`
+
+Semicolon-separated list of regular expressions that the check ignores.
+
+Default is an empty list.
+
+### bugprone-shared-ptr-array-mismatch
+
+Finds initializations of C++ shared pointers to non-array type that are initialized with an array.
+
+If a shared pointer `std::shared_ptr<T>` is initialized with a new-expression `new T[]` the memory is not deallocated correctly. The pointer uses plain `delete` in this case to deallocate the target memory. Instead a `delete[]` call is needed. A `std::shared_ptr<T[]>` calls the correct delete operator.
+
+The check offers replacement of `shared_ptr<T>` to `shared_ptr<T[]>` if it is used at a single variable declaration (one variable in one statement).
+
+Example:
+
+```
+std::shared_ptr<Foo> x(new Foo[10]); // -> std::shared_ptr<Foo[]> x(new Foo[10]);
+//                     ^ warning: shared pointer to non-array is initialized with array [bugprone-shared-ptr-array-mismatch]
+std::shared_ptr<Foo> x1(new Foo), x2(new Foo[10]); // no replacement
+//                                   ^ warning: shared pointer to non-array is initialized with array [bugprone-shared-ptr-array-mismatch]
+
+std::shared_ptr<Foo> x3(new Foo[10], [](const Foo *ptr) { delete[] ptr; }); // no warning
+
+struct S {
+  std::shared_ptr<Foo> x(new Foo[10]); // no replacement in this case
+  //                     ^ warning: shared pointer to non-array is initialized with array [bugprone-shared-ptr-array-mismatch]
+};
+```
+
+This check partially covers the CERT C++ Coding Standard rule [MEM51-CPP. Properly deallocate dynamically allocated resources](https://wiki.sei.cmu.edu/confluence/display/cplusplus/MEM51-CPP.+Properly+deallocate+dynamically+allocated+resources) However, only the `std::shared_ptr` case is detected by this check.
+
+### bugprone-signal-handler
+
+Finds specific constructs in signal handler functions that can cause undefined behavior. The rules for what is allowed differ between C++ language versions.
+
+Checked signal handler rules for C:
+
+- Calls to non-asynchronous-safe functions are not allowed.
+
+Checked signal handler rules for up to and including C++14:
+
+- Calls to non-asynchronous-safe functions are not allowed.
+- C++-specific code constructs are not allowed in signal handlers. In other words, only the common subset of C and C++ is allowed to be used.
+- Calls to functions with non-C linkage are not allowed (including the signal handler itself).
+
+The check is disabled on C++17 and later.
+
+Asynchronous-safety is determined by comparing the function’s name against a set of known functions. In addition, the function must come from a system header include and in a global namespace. The (possible) arguments passed to the function are not checked. Any function that cannot be determined to be asynchronous-safe is assumed to be non-asynchronous-safe by the check, including user functions for which only the declaration is visible. Calls to user-defined functions with visible definitions are checked recursively.
+
+This check implements the CERT C Coding Standard rule [SIG30-C. Call only asynchronous-safe functions within signal handlers](https://www.securecoding.cert.org/confluence/display/c/SIG30-C.+Call+only+asynchronous-safe+functions+within+signal+handlers) and the rule [MSC54-CPP. A signal handler must be a plain old function](https://wiki.sei.cmu.edu/confluence/display/cplusplus/MSC54-CPP.+A+signal+handler+must+be+a+plain+old+function). It has the alias names `cert-sig30-c` and `cert-msc54-cpp`.
+
+#### Options
+
+##### `AsyncSafeFunctionSet`
+
+Selects which set of functions is considered as asynchronous-safe (and therefore allowed in signal handlers).
+
+It can be set to the following values:
+
+`minimal`
+
+- Selects a minimal set that is defined in the CERT SIG30-C rule. and includes functions `abort()`, `_Exit()`, `quick_exit()` and `signal()`.
+
+`POSIX`
+
+- Selects a larger set of functions that is listed in POSIX.1-2017 (see [this link](https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_04_03) for more information).
+- The following functions are included: `_Exit`, `_exit`, `abort`, `accept`, `access`, `aio_error`, `aio_return`, `aio_suspend`, `alarm`, `bind`, `cfgetispeed`, `cfgetospeed`, `cfsetispeed`, `cfsetospeed`, `chdir`, `chmod`, `chown`, `clock_gettime`, `close`, `connect`, `creat`, `dup`, `dup2`, `execl`, `execle`, `execv`, `execve`, `faccessat`, `fchdir`, `fchmod`, `fchmodat`, `fchown`, `fchownat`, `fcntl`, `fdatasync`, `fexecve`, `ffs`, `fork`, `fstat`, `fstatat`, `fsync`, `ftruncate`, `futimens`, `getegid`, `geteuid`, `getgid`, `getgroups`, `getpeername`, `getpgrp`, `getpid`, `getppid`, `getsockname`, `getsockopt`, `getuid`, `htonl`, `htons`, `kill`, `link`, `linkat`, `listen`, `longjmp`, `lseek`, `lstat`, `memccpy`, `memchr`, `memcmp`, `memcpy`, `memmove`, `memset`, `mkdir`, `mkdirat`, `mkfifo`, `mkfifoat`, `mknod`, `mknodat`, `ntohl`, `ntohs`, `open`, `openat`, `pause`, `pipe`, `poll`, `posix_trace_event`, `pselect`, `pthread_kill`, `pthread_self`, `pthread_sigmask`, `quick_exit`, `raise`, `read`, `readlink`, `readlinkat`, `recv`, `recvfrom`, `recvmsg`, `rename`, `renameat`, `rmdir`, `select`, `sem_post`, `send`, `sendmsg`, `sendto`, `setgid`, `setpgid`, `setsid`, `setsockopt`, `setuid`, `shutdown`, `sigaction`, `sigaddset`, `sigdelset`, `sigemptyset`, `sigfillset`, `sigismember`, `siglongjmp`, `signal`, `sigpause`, `sigpending`, `sigprocmask`, `sigqueue`, `sigset`, `sigsuspend`, `sleep`, `sockatmark`, `socket`, `socketpair`, `stat`, `stpcpy`, `stpncpy`, `strcat`, `strchr`, `strcmp`, `strcpy`, `strcspn`, `strlen`, `strncat`, `strncmp`, `strncpy`, `strnlen`, `strpbrk`, `strrchr`, `strspn`, `strstr`, `strtok_r`, `symlink`, `symlinkat`, `tcdrain`, `tcflow`, `tcflush`, `tcgetattr`, `tcgetpgrp`, `tcsendbreak`, `tcsetattr`, `tcsetpgrp`, `time`, `timer_getoverrun`, `timer_gettime`, `timer_settime`, `times`, `umask`, `uname`, `unlink`, `unlinkat`, `utime`, `utimensat`, `utimes`, `wait`, `waitpid`, `wcpcpy`, `wcpncpy`, `wcscat`, `wcschr`, `wcscmp`, `wcscpy`, `wcscspn`, `wcslen`, `wcsncat`, `wcsncmp`, `wcsncpy`, `wcsnlen`, `wcspbrk`, `wcsrchr`, `wcsspn`, `wcsstr`, `wcstok`, `wmemchr`, `wmemcmp`, `wmemcpy`, `wmemmove`, `wmemset`, `write`.
+- The function `quick_exit` is not included in the POSIX list but it is included here in the set of safe functions.
+
+The default value is `POSIX`.
+
+### bugprone-signed-char-misuse
+
+cert-str34-c redirects here as an alias for this check. For the CERT alias, the DiagnoseSignedUnsignedCharComparisons option is set to false.
+
+Finds those `signed char` -> integer conversions which might indicate a programming error. The basic problem with the `signed char`, that it might store the non-ASCII characters as negative values. This behavior can cause a misunderstanding of the written code both when an explicit and when an implicit conversion happens.
+
+When the code contains an explicit `signed char` -> integer conversion, the human programmer probably expects that the converted value matches with the character code (a value from [0..255]), however, the actual value is in [-128..127] interval. To avoid this kind of misinterpretation, the desired way of converting from a `signed char` to an integer value is converting to `unsigned char` first, which stores all the characters in the positive [0..255] interval which matches the known character codes.
+
+In case of implicit conversion, the programmer might not actually be aware that a conversion happened and char value is used as an integer. There are some use cases when this unawareness might lead to a functionally imperfect code. For example, checking the equality of a `signed char` and an `unsigned char` variable is something we should avoid in C++ code. During this comparison, the two variables are converted to integers which have different value ranges. For `signed char`, the non-ASCII characters are stored as a value in [-128..-1] interval, while the same characters are stored in the [128..255] interval for an `unsigned char`.
+
+It depends on the actual platform whether plain `char` is handled as `signed char` by default and so it is caught by this check or not. To change the default behavior you can use `-funsigned-char` and `-fsigned-char` compilation options.
+
+Currently, this check warns in the following cases: - `signed char` is assigned to an integer variable - `signed char` and `unsigned char` are compared with equality/inequality operator - `signed char` is converted to an integer in the array subscript
+
+See also: [STR34-C. Cast characters to unsigned char before converting to larger integer sizes](https://wiki.sei.cmu.edu/confluence/display/c/STR34-C.+Cast+characters+to+unsigned+char+before+converting+to+larger+integer+sizes)
+
+A good example from the CERT description when a `char` variable is used to read from a file that might contain non-ASCII characters. The problem comes up when the code uses the `-1` integer value as EOF, while the 255 character code is also stored as `-1` in two’s complement form of char type. See a simple example of this below. This code stops not only when it reaches the end of the file, but also when it gets a character with the 255 code.
+
+```
+#define EOF (-1)
+
+int read(void) {
+  char CChar;
+  int IChar = EOF;
+
+  if (readChar(CChar)) {
+    IChar = CChar;
+  }
+  return IChar;
+}
+```
+
+A proper way to fix the code above is converting the `char` variable to an `unsigned char` value first.
+
+```
+#define EOF (-1)
+
+int read(void) {
+  char CChar;
+  int IChar = EOF;
+
+  if (readChar(CChar)) {
+    IChar = static_cast<unsigned char>(CChar);
+  }
+  return IChar;
+}
+```
+
+Another use case is checking the equality of two `char` variables with different signedness. Inside the non-ASCII value range this comparison between a `signed char` and an `unsigned char` always returns `false`.
+
+```
+bool compare(signed char SChar, unsigned char USChar) {
+  if (SChar == USChar)
+    return true;
+  return false;
+}
+```
+
+The easiest way to fix this kind of comparison is casting one of the arguments, so both arguments will have the same type.
+
+```
+bool compare(signed char SChar, unsigned char USChar) {
+  if (static_cast<unsigned char>(SChar) == USChar)
+    return true;
+  return false;
+}
+```
+
+#### Options
+
+`CharTypdefsToIgnore`
+
+A semicolon-separated list of typedef names. In this list, we can list typedefs for `char` or `signed char`, which will be ignored by the check. This is useful when a typedef introduces an integer alias like `sal_Int8` or `int8_t`. In this case, human misinterpretation is not an issue.
+
+`DiagnoseSignedUnsignedCharComparisons`
+
+When true, the check will warn on `signed char`/`unsigned char` comparisons, otherwise these comparisons are ignored.
+
+By default, this option is set to true.
+
+### bugprone-sizeof-container
+
+The check finds usages of `sizeof` on expressions of STL container types. Most likely the user wanted to use `.size()` instead.
+
+All class/struct types declared in namespace `std::` having a const `size()` method are considered containers, with the exception of `std::bitset` and `std::array`.
+
+Examples:
+
+```
+std::string s;
+int a = 47 + sizeof(s); // warning: sizeof() doesn't return the size of the container. Did you mean .size()?
+
+int b = sizeof(std::string); // no warning, probably intended.
+
+std::string array_of_strings[10];
+int c = sizeof(array_of_strings) / sizeof(array_of_strings[0]); // no warning, definitely intended.
+
+std::array<int, 3> std_array;
+int d = sizeof(std_array); // no warning, probably intended.
+```
+
+### bugprone-sizeof-expression
+
+The check finds usages of `sizeof` expressions which are most likely errors.
+
+The `sizeof` operator yields the size (in bytes) of its operand, which may be an expression or the parenthesized name of a type. Misuse of this operator may be leading to errors and possible software vulnerabilities.
+
+#### Suspicious usage of `sizeof(K)`
+
+A common mistake is to query the `sizeof` of an integer literal. This is equivalent to query the size of its type (probably `int`). The intent of the programmer was probably to simply get the integer and not its size.
+
+```
+#define BUFLEN 42
+char buf[BUFLEN];
+memset(buf, 0, sizeof(BUFLEN));  // sizeof(42) ==> sizeof(int)
+```
+
+#### Suspicious usage of `sizeof(expr)`
+
+In cases, where there is an enum or integer to represent a type, a common mistake is to query the `sizeof` on the integer or enum that represents the type that should be used by `sizeof`. This results in the size of the integer and not of the type the integer represents:
+
+```
+enum data_type {
+  FLOAT_TYPE,
+  DOUBLE_TYPE
+};
+
+struct data {
+  data_type type;
+  void* buffer;
+  data_type get_type() {
+    return type;
+  }
+};
+
+void f(data d, int numElements) {
+  // should be sizeof(float) or sizeof(double), depending on d.get_type()
+  int numBytes = numElements * sizeof(d.get_type());
+  ...
+}
+```
+
+#### Suspicious usage of `sizeof(this)`
+
+The `this` keyword is evaluated to a pointer to an object of a given type. The expression `sizeof(this)` is returning the size of a pointer. The programmer most likely wanted the size of the object and not the size of the pointer.
+
+```
+class Point {
+  [...]
+  size_t size() { return sizeof(this); }  // should probably be sizeof(*this)
+  [...]
+};
+```
+
+#### Suspicious usage of `sizeof(char*)`
+
+There is a subtle difference between declaring a string literal with `char* A = ""` and `char A[] = ""`. The first case has the type `char*` instead of the aggregate type `char[]`. Using `sizeof` on an object declared with `char*` type is returning the size of a pointer instead of the number of characters (bytes) in the string literal.
+
+```
+const char* kMessage = "Hello World!";      // const char kMessage[] = "...";
+void getMessage(char* buf) {
+  memcpy(buf, kMessage, sizeof(kMessage));  // sizeof(char*)
+}
+```
+
+#### Suspicious usage of `sizeof(A*)`
+
+A common mistake is to compute the size of a pointer instead of its pointee. These cases may occur because of explicit cast or implicit conversion.
+
+```
+int A[10];
+memset(A, 0, sizeof(A + 0));
+
+struct Point point;
+memset(point, 0, sizeof(&point));
+```
+
+#### Suspicious usage of `sizeof(…)/sizeof(…)`
+
+Dividing `sizeof` expressions is typically used to retrieve the number of elements of an aggregate. This check warns on incompatible or suspicious cases.
+
+In the following example, the entity has 10-bytes and is incompatible with the type `int` which has 4 bytes.
+
+```
+char buf[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };  // sizeof(buf) => 10
+void getMessage(char* dst) {
+  memcpy(dst, buf, sizeof(buf) / sizeof(int));  // sizeof(int) => 4  [incompatible sizes]
+}
+```
+
+In the following example, the expression `sizeof(Values)` is returning the size of `char*`. One can easily be fooled by its declaration, but in parameter declaration the size ‘10’ is ignored and the function is receiving a `char*`.
+
+```
+char OrderedValues[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+return CompareArray(char Values[10]) {
+  return memcmp(OrderedValues, Values, sizeof(Values)) == 0;  // sizeof(Values) ==> sizeof(char*) [implicit cast to char*]
+}
+```
+
+#### Suspicious `sizeof` by `sizeof` expression
+
+Multiplying `sizeof` expressions typically makes no sense and is probably a logic error. In the following example, the programmer used `*` instead of `/`.
+
+```
+const char kMessage[] = "Hello World!";
+void getMessage(char* buf) {
+  memcpy(buf, kMessage, sizeof(kMessage) * sizeof(char));  //  sizeof(kMessage) / sizeof(char)
+}
+```
+
+This check may trigger on code using the arraysize macro. The following code is working correctly but should be simplified by using only the `sizeof` operator.
+
+```
+extern Object objects[100];
+void InitializeObjects() {
+  memset(objects, 0, arraysize(objects) * sizeof(Object));  // sizeof(objects)
+}
+```
+
+#### Suspicious usage of `sizeof(sizeof(…))`
+
+Getting the `sizeof` of a `sizeof` makes no sense and is typically an error hidden through macros.
+
+```
+#define INT_SZ sizeof(int)
+int buf[] = { 42 };
+void getInt(int* dst) {
+  memcpy(dst, buf, sizeof(INT_SZ));  // sizeof(sizeof(int)) is suspicious.
+}
+```
+
+#### Options
+
+##### `WarnOnSizeOfConstant`
+
+When true, the check will warn on an expression like `sizeof(CONSTANT)`.
+
+Default is true.
+
+##### `WarnOnSizeOfIntegerExpression`
+
+When true, the check will warn on an expression like `sizeof(expr)` where the expression results in an integer.
+
+Default is false.
+
+##### `WarnOnSizeOfThis`
+
+When true, the check will warn on an expression like `sizeof(this)`.
+
+Default is true.
+
+##### `WarnOnSizeOfCompareToConstant`
+
+When true, the check will warn on an expression like `sizeof(expr) <= k` for a suspicious constant k while k is 0 or greater than 0x8000.
+
+Default is true.
+
+##### `WarnOnSizeOfPointerToAggregate`
+
+When true, the check will warn on an expression like ``sizeof(expr)` where the expression is a pointer to aggregate.
+
+Default is true.
+
+### bugprone-spuriously-wake-up-functions
+
+Finds `cnd_wait`, `cnd_timedwait`, `wait`, `wait_for`, or `wait_until` function calls when the function is not invoked from a loop that checks whether a condition predicate holds or the function has a condition parameter.
+
+```
+if (condition_predicate) {
+    condition.wait(lk);
+}
+if (condition_predicate) {
+    if (thrd_success != cnd_wait(&condition, &lock)) {
+    }
+}
+```
+
+This check corresponds to the CERT C++ Coding Standard rule [CON54-CPP. Wrap functions that can spuriously wake up in a loop](https://wiki.sei.cmu.edu/confluence/display/cplusplus/CON54-CPP.+Wrap+functions+that+can+spuriously+wake+up+in+a+loop). and CERT C Coding Standard rule [CON36-C. Wrap functions that can spuriously wake up in a loop](https://wiki.sei.cmu.edu/confluence/display/c/CON36-C.+Wrap+functions+that+can+spuriously+wake+up+in+a+loop).
+
+### bugprone-standalone-empty
+
+Warns when `empty()` is used on a range and the result is ignored. Suggests `clear()` if it is an existing member function.
+
+The `empty()` method on several common ranges returns a Boolean indicating whether or not the range is empty, but is often mistakenly interpreted as a way to clear the contents of a range. Some ranges offer a `clear()` method for this purpose. This check warns when a call to empty returns a result that is ignored, and suggests replacing it with a call to `clear()` if it is available as a member function of the range.
+
+For example, the following code could be used to indicate whether a range is empty or not, but the result is ignored:
+
+```
+std::vector<int> v;
+...
+v.empty();
+```
+
+A call to `clear()` would appropriately clear the contents of the range:
+
+```
+std::vector<int> v;
+...
+v.clear();
+```
+
+#### Limitations
+
+- Doesn’t warn if `empty()` is defined and used with the ignore result in the class template definition (for example in the library implementation). These error cases can be caught with `[[nodiscard]]` attribute.
+
+### bugprone-string-constructor
+
+Finds string constructors that are suspicious and probably errors.
+
+A common mistake is to swap parameters to the ‘fill’ string-constructor.
+
+Examples:
+
+```
+std::string str('x', 50); // should be str(50, 'x')
+```
+
+Calling the string-literal constructor with a length bigger than the literal is suspicious and adds extra random characters to the string.
+
+Examples:
+
+```
+std::string("test", 200);   // Will include random characters after "test".
+std::string_view("test", 200);
+```
+
+Creating an empty string from constructors with parameters is considered suspicious. The programmer should use the empty constructor instead.
+
+Examples:
+
+```
+std::string("test", 0);   // Creation of an empty string.
+std::string_view("test", 0);
+```
+
+#### Options
+
+##### `WarnOnLargeLength`
+
+When true, the check will warn on a string with a length greater than [`LargeLengthThreshold`](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/string-constructor.html#cmdoption-arg-LargeLengthThreshold).
+
+Default is true.
+
+##### `LargeLengthThreshold`
+
+An integer specifying the large length threshold.
+
+Default is 0x800000.
+
+##### `StringNames`
+
+Default is `::std::basic_string`;`::std::basic_string_view`.
+
+Semicolon-delimited list of class names to apply this check to.
+
+By default `::std::basic_string` applies to `std::string` and `std::wstring`.
+
+Set to e.g. `::std::basic_string`;`llvm::StringRef`;`QString` to perform this check on custom classes.
+
+### bugprone-string-integer-assignment
+
+The check finds assignments of an integer to `std::basic_string<CharT>` (`std::string`, `std::wstring`, etc.).
+
+The source of the problem is the following assignment operator of `std::basic_string<CharT>`:
+
+```
+basic_string& operator=( CharT ch );
+```
+
+Numeric types can be implicitly casted to character types.
+
+```
+std::string s;
+int x = 5965;
+s = 6;
+s = x;
+```
+
+Use the appropriate conversion functions or character literals.
+
+```
+std::string s;
+int x = 5965;
+s = '6';
+s = std::to_string(x);
+```
+
+In order to suppress false positives, use an explicit cast.
+
+```
+std::string s;
+s = static_cast<char>(6);
+```
+
+### bugprone-string-literal-with-embedded-nul
+
+Finds occurrences of string literal with embedded NUL character and validates their usage.
+
+#### Invalid escaping
+
+Special characters can be escaped within a string literal by using their hexadecimal encoding like `\x42`. A common mistake is to escape them like this `\0x42` where the `\0` stands for the NUL character.
+
+```
+const char* Example[] = "Invalid character: \0x12 should be \x12";
+const char* Bytes[] = "\x03\0x02\0x01\0x00\0xFF\0xFF\0xFF";
+```
+
+#### Truncated literal
+
+String-like classes can manipulate strings with embedded NUL as they are keeping track of the bytes and the length. This is not the case for a `char*` (NUL-terminated) string.
+
+A common mistake is to pass a string-literal with embedded NUL to a string constructor expecting a NUL-terminated string. The bytes after the first NUL character are truncated.
+
+```
+std::string str("abc\0def");  // "def" is truncated
+str += "\0";                  // This statement is doing nothing
+if (str == "\0abc") return;   // This expression is always true
+```
+
+### bugprone-stringview-nullptr
+
+Checks for various ways that the `const CharT*` constructor of `std::basic_string_view` can be passed a null argument and replaces them with the default constructor in most cases. For the comparison operators, braced initializer list does not compile so instead a call to `.empty()` or the empty string literal are used, where appropriate.
+
+This prevents code from invoking behavior which is unconditionally undefined. The single-argument `const CharT*` constructor does not check for the null case before dereferencing its input. The standard is slated to add an explicitly-deleted overload to catch some of these cases: wg21.link/p2166
+
+To catch the additional cases of `NULL` (which expands to `__null`) and `0`, first run the `modernize-use-nullptr` check to convert the callers to `nullptr`.
+
+```
+std::string_view sv = nullptr;
+
+sv = nullptr;
+
+bool is_empty = sv == nullptr;
+bool isnt_empty = sv != nullptr;
+
+accepts_sv(nullptr);
+
+accepts_sv({{}});  // A
+
+accepts_sv({nullptr, 0});  // B
+```
+
+is translated into…
+
+```
+std::string_view sv = {};
+
+sv = {};
+
+bool is_empty = sv.empty();
+bool isnt_empty = !sv.empty();
+
+accepts_sv("");
+
+accepts_sv("");  // A
+
+accepts_sv({nullptr, 0});  // B
+```
+
+#### Note
+
+The source pattern with trailing comment “A” selects the `(const CharT*)` constructor overload and then value-initializes the pointer, causing a null dereference. It happens to not include the `nullptr` literal, but it is still within the scope of this ClangTidy check.
+
+#### Note
+
+The source pattern with trailing comment “B” selects the `(const CharT*, size_type)` constructor which is perfectly valid, since the length argument is `0`. It is not changed by this ClangTidy check.
+
+### bugprone-suspicious-enum-usage
+
+The checker detects various cases when an enum is probably misused (as a bitmask ).
+
+1. When “ADD” or “bitwise OR” is used between two enum which come from different types and these types value ranges are not disjoint.
+
+The following cases will be investigated only using [`StrictMode`](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/argument-comment.html#cmdoption-arg-StrictMode). We regard the enum as a (suspicious) bitmask if the three conditions below are true at the same time:
+
+- at most half of the elements of the enum are non pow-of-2 numbers (because of short enumerations)
+- there is another non pow-of-2 number than the enum constant representing all choices (the result “bitwise OR” operation of all enum elements)
+- enum type variable/enumconstant is used as an argument of a + or “bitwise OR “ operator
+
+So whenever the non pow-of-2 element is used as a bitmask element we diagnose a misuse and give a warning.
+
+1. Investigating the right hand side of += and |= operator.
+2. Check only the enum value side of a | and + operator if one of them is not enum val.
+3. Check both side of | or + operator where the enum values are from the same enum type.
+
+Examples:
+
+```
+enum { A, B, C };
+enum { D, E, F = 5 };
+enum { G = 10, H = 11, I = 12 };
+
+unsigned flag;
+flag =
+    A |
+    H; // OK, disjoint value intervals in the enum types ->probably good use.
+flag = B | F; // Warning, have common values so they are probably misused.
+
+// Case 2:
+enum Bitmask {
+  A = 0,
+  B = 1,
+  C = 2,
+  D = 4,
+  E = 8,
+  F = 16,
+  G = 31 // OK, real bitmask.
+};
+
+enum Almostbitmask {
+  AA = 0,
+  BB = 1,
+  CC = 2,
+  DD = 4,
+  EE = 8,
+  FF = 16,
+  GG // Problem, forgot to initialize.
+};
+
+unsigned flag = 0;
+flag |= E; // OK.
+flag |=
+    EE; // Warning at the decl, and note that it was used here as a bitmask.
+```
+
+#### Options
+
+##### `StrictMode`
+
+Default value: 0.
+
+When non-null the suspicious bitmask usage will be investigated additionally to the different enum usage check.
+
+### bugprone-suspicious-include
+
+The check detects various cases when an include refers to what appears to be an implementation file, which often leads to hard-to-track-down ODR violations.
+
+Examples:
+
+```
+#include "Dinosaur.hpp"     // OK, .hpp files tend not to have definitions.
+#include "Pterodactyl.h"    // OK, .h files tend not to have definitions.
+#include "Velociraptor.cpp" // Warning, filename is suspicious.
+#include_next <stdio.c>     // Warning, filename is suspicious.
+```
+
+#### Options
+
+##### `HeaderFileExtensions`
+
+Note: this option is deprecated, it will be removed in **clang-tidy** version 19. Please use the global configuration option HeaderFileExtensions.Default value: `";h;hh;hpp;hxx"` A semicolon-separated list of filename extensions of header files (the filename extensions should not contain a “.” prefix). For extension-less header files, use an empty string or leave an empty string between “;” if there are other filename extensions.
+
+##### ImplementationFileExtensions
+
+Note: this option is deprecated, it will be removed in **clang-tidy** version 19. Please use the global configuration option ImplementationFileExtensions.Default value: `"c;cc;cpp;cxx"` Likewise, a semicolon-separated list of filename extensions of implementation files.
+
+### bugprone-suspicious-memory-comparison
+
+Finds potentially incorrect calls to `memcmp()` based on properties of the arguments.
+
+The following cases are covered:
+
+**Case 1: Non-standard-layout type**
+
+Comparing the object representations of non-standard-layout objects may not properly compare the value representations.
+
+**Case 2: Types with no unique object representation**
+
+Objects with the same value may not have the same object representation. This may be caused by padding or floating-point types.
+
+See also: [EXP42-C. Do not compare padding data](https://wiki.sei.cmu.edu/confluence/display/c/EXP42-C.+Do+not+compare+padding+data) and [FLP37-C. Do not use object representations to compare floating-point values](https://wiki.sei.cmu.edu/confluence/display/c/FLP37-C.+Do+not+use+object+representations+to+compare+floating-point+values)
+
+This check is also related to and partially overlaps the CERT C++ Coding Standard rules [OOP57-CPP. Prefer special member functions and overloaded operators to C Standard Library functions](https://wiki.sei.cmu.edu/confluence/display/cplusplus/OOP57-CPP.+Prefer+special+member+functions+and+overloaded+operators+to+C+Standard+Library+functions) and [EXP62-CPP. Do not access the bits of an object representation that are not part of the object’s value representation](https://wiki.sei.cmu.edu/confluence/display/cplusplus/EXP62-CPP.+Do+not+access+the+bits+of+an+object+representation+that+are+not+part+of+the+object's+value+representation)
+
+### bugprone-suspicious-memset-usage
+
+This check finds `memset()` calls with potential mistakes in their arguments. Considering the function as `void* memset(void* destination, int fill_value, size_t byte_count)`, the following cases are covered:
+
+**Case 1: Fill value is a character `'0'`**
+
+Filling up a memory area with ASCII code 48 characters is not customary, possibly integer zeroes were intended instead. The check offers a replacement of `'0'` with `0`. Memsetting character pointers with `'0'` is allowed.
+
+**Case 2: Fill value is truncated**
+
+Memset converts `fill_value` to `unsigned char` before using it. If `fill_value` is out of unsigned character range, it gets truncated and memory will not contain the desired pattern.
+
+**Case 3: Byte count is zero**
+
+Calling memset with a literal zero in its `byte_count` argument is likely to be unintended and swapped with `fill_value`. The check offers to swap these two arguments.
+
+Corresponding cpplint.py check name: `runtime/memset`.
+
+Examples:
+
+```c++
+void foo() {
+  int i[5] = {1, 2, 3, 4, 5};
+  int *ip = i;
+  char c = '1';
+  char *cp = &c;
+  int v = 0;
+
+  // Case 1
+  memset(ip, '0', 1); // suspicious
+  memset(cp, '0', 1); // OK
+
+  // Case 2
+  memset(ip, 0xabcd, 1); // fill value gets truncated
+  memset(ip, 0x00, 1);   // OK
+
+  // Case 3
+  memset(ip, sizeof(int), v); // zero length, potentially swapped
+  memset(ip, 0, 1);           // OK
+}
+```
+
+### bugprone-suspicious-missing-comma
+
+String literals placed side-by-side are concatenated at translation phase 6 (after the preprocessor). This feature is used to represent long string literal on multiple lines.
+
+For instance, the following declarations are equivalent:
+
+```c++
+const char* A[] = "This is a test";
+const char* B[] = "This" " is a "    "test";
+```
+
+A common mistake done by programmers is to forget a comma between two string literals in an array initializer list.
+
+```c++
+const char* Test[] = {
+  "line 1",
+  "line 2"     // Missing comma!
+  "line 3",
+  "line 4",
+  "line 5"
+};
+```
+
+The array contains the string “line 2line3” at offset 1 (i.e. Test[1]). Clang won’t generate warnings at compile time.
+
+This check may warn incorrectly on cases like:
+
+```c++
+const char* SupportedFormat[] = {
+  "Error %s",
+  "Code " PRIu64,   // May warn here.
+  "Warning %s",
+};
+```
+
+#### Options
+
+##### `SizeThreshold`
+
+An unsigned integer specifying the minimum size of a string literal to be considered by the check.
+
+Default is `5U`.
+
+##### `RatioThreshold`
+
+A string specifying the maximum threshold ratio [0, 1.0] of suspicious string literals to be considered.
+
+Default is `".2"`.
+
+##### `MaxConcatenatedTokens`
+
+An unsigned integer specifying the maximum number of concatenated tokens.
+
+Default is `5U`.
+
+### bugprone-suspicious-realloc-usage
+
+This check finds usages of `realloc` where the return value is assigned to the same expression as passed to the first argument: `p = realloc(p, size);` The problem with this construct is that if `realloc` fails it returns a null pointer but does not deallocate the original memory. If no other variable is pointing to it, the original memory block is not available any more for the program to use or free. In either case `p = realloc(p, size);` indicates bad coding style and can be replaced by `q = realloc(p, size);`.
+
+The pointer expression (used at `realloc`) can be a variable or a field member of a data structure, but can not contain function calls or unresolved types.
+
+In obvious cases when the pointer used at realloc is assigned to another variable before the `realloc` call, no warning is emitted. This happens only if a simple expression in form of `q = p` or `void *q = p` is found in the same function where `p = realloc(p, ...)` is found. The assignment has to be before the call to realloc (but otherwise at any place) in the same function. This suppression works only if `p` is a single variable.
+
+Examples:
+
+```c++
+struct A {
+  void *p;
+};
+
+A &getA();
+
+void foo(void *p, A *a, int new_size) {
+  p = realloc(p, new_size); // warning: 'p' may be set to null if 'realloc' fails, which may result in a leak of the original buffer
+  a->p = realloc(a->p, new_size); // warning: 'a->p' may be set to null if 'realloc' fails, which may result in a leak of the original buffer
+  getA().p = realloc(getA().p, new_size); // no warning
+}
+
+void foo1(void *p, int new_size) {
+  void *p1 = p;
+  p = realloc(p, new_size); // no warning
+}
+```
+
+### bugprone-suspicious-semicolon
+
+Finds most instances of stray semicolons that unexpectedly alter the meaning of the code. More specifically, it looks for `if`, `while`, `for` and `for-range` statements whose body is a single semicolon, and then analyzes the context of the code (e.g. indentation) in an attempt to determine whether that is intentional.
+
+```
+if (x < y);
+{
+  x++;
+}
+```
+
+Here the body of the `if` statement consists of only the semicolon at the end of the first line, and x will be incremented regardless of the condition.
+
+```
+while ((line = readLine(file)) != NULL);
+  processLine(line);
+```
+
+As a result of this code, processLine() will only be called once, when the `while` loop with the empty body exits with line == NULL. The indentation of the code indicates the intention of the programmer.
+
+```
+if (x >= y);
+x -= y;
+```
+
+While the indentation does not imply any nesting, there is simply no valid reason to have an if statement with an empty body (but it can make sense for a loop). So this check issues a warning for the code above.
+
+To solve the issue remove the stray semicolon or in case the empty body is intentional, reflect this using code indentation or put the semicolon in a new line. For example:
+
+```
+while (readWhitespace());
+  Token t = readNextToken();
+```
+
+Here the second line is indented in a way that suggests that it is meant to be the body of the while loop - whose body is in fact empty, because of the semicolon at the end of the first line.
+
+Either remove the indentation from the second line:
+
+```
+while (readWhitespace());
+Token t = readNextToken();
+```
+
+… or move the semicolon from the end of the first line to a new line:
+
+```
+while (readWhitespace())
+  ;
+
+  Token t = readNextToken();
+```
+
+In this case the check will assume that you know what you are doing, and will not raise a warning.
+
+### bugprone-suspicious-string-compare
+
+Find suspicious usage of runtime string comparison functions. This check is valid in C and C++.
+
+Checks for calls with implicit comparator and proposed to explicitly add it.
+
+```
+if (strcmp(...))       // Implicitly compare to zero
+if (!strcmp(...))      // Won't warn
+if (strcmp(...) != 0)  // Won't warn
+```
+
+Checks that compare function results (i.e., `strcmp`) are compared to valid constant. The resulting value is
+
+```
+<  0    when lower than,
+>  0    when greater than,
+== 0    when equals.
+```
+
+A common mistake is to compare the result to 1 or -1.
+
+```
+if (strcmp(...) == -1)  // Incorrect usage of the returned value.
+```
+
+Additionally, the check warns if the results value is implicitly cast to a *suspicious* non-integer type. It’s happening when the returned value is used in a wrong context.
+
+```
+if (strcmp(...) < 0.)  // Incorrect usage of the returned value.
+```
+
+#### Options
+
+##### `WarnOnImplicitComparison`
+
+When true, the check will warn on implicit comparison.
+
+true by default.
+
+##### `WarnOnLogicalNotComparison`
+
+When true, the check will warn on logical not comparison.
+
+false by default.
+
+##### `StringCompareLikeFunctions`
+
+A string specifying the comma-separated names of the extra string comparison functions.
+
+Default is an empty string.
+
+The check will detect the following string comparison functions: `__builtin_memcmp`, `__builtin_strcasecmp`, `__builtin_strcmp`, `__builtin_strncasecmp`, `__builtin_strncmp`, `_mbscmp`, `_mbscmp_l`, `_mbsicmp`, `_mbsicmp_l`, `_mbsnbcmp`, `_mbsnbcmp_l`, `_mbsnbicmp`, `_mbsnbicmp_l`, `_mbsncmp`, `_mbsncmp_l`, `_mbsnicmp`, `_mbsnicmp_l`, `_memicmp`, `_memicmp_l`, `_stricmp`, `_stricmp_l`, `_strnicmp`, `_strnicmp_l`, `_wcsicmp`, `_wcsicmp_l`, `_wcsnicmp`, `_wcsnicmp_l`, `lstrcmp`, `lstrcmpi`, `memcmp`, `memicmp`, `strcasecmp`, `strcmp`, `strcmpi`, `stricmp`, `strncasecmp`, `strncmp`, `strnicmp`, `wcscasecmp`, `wcscmp`, `wcsicmp`, `wcsncmp`, `wcsnicmp`, `wmemcmp`.
+
+### bugprone-swapped-arguments
+
+Finds potentially swapped arguments by examining implicit conversions. It analyzes the types of the arguments being passed to a function and compares them to the expected types of the corresponding parameters. If there is a mismatch or an implicit conversion that indicates a potential swap, a warning is raised.
+
+```
+void printNumbers(int a, float b);
+
+int main() {
+  // Swapped arguments: float passed as int, int as float)
+  printNumbers(10.0f, 5);
+  return 0;
+}
+```
+
+Covers a wide range of implicit conversions, including: - User-defined conversions - Conversions from floating-point types to boolean or integral types - Conversions from integral types to boolean or floating-point types - Conversions from boolean to integer types or floating-point types - Conversions from (member) pointers to boolean
+
+It is important to note that for most argument swaps, the types need to match exactly. However, there are exceptions to this rule. Specifically, when the swapped argument is of integral type, an exact match is not always necessary. Implicit casts from other integral types are also accepted. Similarly, when dealing with floating-point arguments, implicit casts between different floating-point types are considered acceptable.
+
+To avoid confusion, swaps where both swapped arguments are of integral types or both are of floating-point types do not trigger the warning. In such cases, it’s assumed that the developer intentionally used different integral or floating-point types and does not raise a warning. This approach prevents false positives and provides flexibility in handling situations where varying integral or floating-point types are intentionally utilized.
+
+### bugprone-switch-missing-default-case
+
+Ensures that switch statements without default cases are flagged, focuses only on covering cases with non-enums where the compiler may not issue warnings.
+
+Switch statements without a default case can lead to unexpected behavior and incomplete handling of all possible cases. When a switch statement lacks a default case, if a value is encountered that does not match any of the specified cases, the program will continue execution without any defined behavior or handling.
+
+This check helps identify switch statements that are missing a default case, allowing developers to ensure that all possible cases are handled properly. Adding a default case allows for graceful handling of unexpected or unmatched values, reducing the risk of program errors and unexpected behavior.
+
+Example:
+
+```
+// Example 1:
+// warning: switching on non-enum value without default case may not cover all cases
+switch (i) {
+case 0:
+  break;
+}
+
+// Example 2:
+enum E { eE1 };
+E e = eE1;
+switch (e) { // no-warning
+case eE1:
+  break;
+}
+
+// Example 3:
+int i = 0;
+switch (i) { // no-warning
+case 0:
+  break;
+default:
+  break;
+}
+```
+
+#### Note
+
+Enum types are already covered by compiler warnings (comes under -Wswitch) when a switch statement does not handle all enum values. This check focuses on non-enum types where the compiler warnings may not be present.
+
+#### See also
+
+The [CppCoreGuideline ES.79](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-default) provide guidelines on switch statements, including the recommendation to always provide a default case.
+
+### bugprone-terminating-continue
+
+Detects `do while` loops with a condition always evaluating to false that have a `continue` statement, as this `continue` terminates the loop effectively.
+
+```
+void f() {
+do {
+  // some code
+  continue; // terminating continue
+  // some other code
+} while(false);
+```
+
+### bugprone-throw-keyword-missing
+
+Warns about a potentially missing `throw` keyword. If a temporary object is created, but the object’s type derives from (or is the same as) a class that has ‘EXCEPTION’, ‘Exception’ or ‘exception’ in its name, we can assume that the programmer’s intention was to throw that object.
+
+Example:
+
+```
+void f(int i) {
+  if (i < 0) {
+    // Exception is created but is not thrown.
+    std::runtime_error("Unexpected argument");
+  }
+}
+```
+
+### bugprone-too-small-loop-variable
+
+Detects those `for` loops that have a loop variable with a “too small” type which means this type can’t represent all values which are part of the iteration range.
+
+```
+int main() {
+  long size = 294967296l;
+  for (short i = 0; i < size; ++i) {}
+}
+```
+
+This `for` loop is an infinite loop because the `short` type can’t represent all values in the `[0..size]` interval.
+
+In a real use case size means a container’s size which depends on the user input.
+
+```
+int doSomething(const std::vector& items) {
+  for (short i = 0; i < items.size(); ++i) {}
+}
+```
+
+This algorithm works for a small amount of objects, but will lead to freeze for a larger user input.
+
+#### Options
+
+##### `MagnitudeBitsUpperLimit`
+
+Upper limit for the magnitude bits of the loop variable. If it’s set the check filters out those catches in which the loop variable’s type has more magnitude bits as the specified upper limit.
+
+The default value is 16.
+
+For example, if the user sets this option to 31 (bits), then a 32-bit `unsigned int` is ignored by the check, however a 32-bit `int` is not (A 32-bit `signed int` has 31 magnitude bits).
+
+```
+int main() {
+  long size = 294967296l;
+  for (unsigned i = 0; i < size; ++i) {} // no warning with MagnitudeBitsUpperLimit = 31 on a system where unsigned is 32-bit
+  for (int i = 0; i < size; ++i) {} // warning with MagnitudeBitsUpperLimit = 31 on a system where int is 32-bit
+}
+```
+
+### bugprone-unchecked-optional-access
+
+*Note*: This check uses a flow-sensitive static analysis to produce its results. Therefore, it may be more resource intensive (RAM, CPU) than the average clang-tidy check.
+
+This check identifies unsafe accesses to values contained in `std::optional<T>`, `absl::optional<T>`, `base::Optional<T>`, or `folly::Optional<T>` objects. Below we will refer to all these types collectively as `optional<T>`.
+
+An access to the value of an `optional<T>` occurs when one of its `value`, `operator*`, or `operator->` member functions is invoked. To align with common misconceptions, the check considers these member functions as equivalent, even though there are subtle differences related to exceptions versus undefined behavior. See *Additional notes*, below, for more information on this topic.
+
+An access to the value of an `optional<T>` is considered safe if and only if code in the local scope (for example, a function body) ensures that the `optional<T>` has a value in all possible execution paths that can reach the access. That should happen either through an explicit check, using the `optional<T>::has_value` member function, or by constructing the `optional<T>` in a way that shows that it unambiguously holds a value (e.g using `std::make_optional` which always returns a populated `std::optional<T>`).
+
+Below we list some examples, starting with unsafe optional access patterns, followed by safe access patterns.
+
+#### Unsafe access patterns
+
+##### Access the value without checking if it exists
+
+The check flags accesses to the value that are not locally guarded by existence check:
+
+```
+void f(std::optional<int> opt) {
+  use(*opt); // unsafe: it is unclear whether `opt` has a value.
+}
+```
+
+##### Access the value in the wrong branch
+
+The check is aware of the state of an optional object in different branches of the code. For example:
+
+```
+void f(std::optional<int> opt) {
+  if (opt.has_value()) {
+  } else {
+    use(opt.value()); // unsafe: it is clear that `opt` does *not* have a value.
+  }
+}
+```
+
+##### Assume a function result to be stable
+
+The check is aware that function results might not be stable. That is, consecutive calls to the same function might return different values. For example:
+
+```
+void f(Foo foo) {
+  if (foo.opt().has_value()) {
+    use(*foo.opt()); // unsafe: it is unclear whether `foo.opt()` has a value.
+  }
+}
+```
+
+##### Rely on invariants of uncommon APIs
+
+The check is unaware of invariants of uncommon APIs. For example:
+
+```
+void f(Foo foo) {
+  if (foo.HasProperty("bar")) {
+    use(*foo.GetProperty("bar")); // unsafe: it is unclear whether `foo.GetProperty("bar")` has a value.
+  }
+}
+```
+
+##### Check if a value exists, then pass the optional to another function
+
+The check relies on local reasoning. The check and value access must both happen in the same function. An access is considered unsafe even if the caller of the function performing the access ensures that the optional has a value. For example:
+
+```
+void g(std::optional<int> opt) {
+  use(*opt); // unsafe: it is unclear whether `opt` has a value.
+}
+
+void f(std::optional<int> opt) {
+  if (opt.has_value()) {
+    g(opt);
+  }
+}
+```
+
+#### Safe access patterns
+
+##### Check if a value exists, then access the value
+
+The check recognizes all straightforward ways for checking if a value exists and accessing the value contained in an optional object. For example:
+
+```
+void f(std::optional<int> opt) {
+  if (opt.has_value()) {
+    use(*opt);
+  }
+}
+```
+
+##### Check if a value exists, then access the value from a copy
+
+The criteria that the check uses is semantic, not syntactic. It recognizes when a copy of the optional object being accessed is known to have a value. For example:
+
+```
+void f(std::optional<int> opt1) {
+  if (opt1.has_value()) {
+    std::optional<int> opt2 = opt1;
+    use(*opt2);
+  }
+}
+```
+
+##### Ensure that a value exists using common macros
+
+The check is aware of common macros like `CHECK` and `DCHECK`. Those can be used to ensure that an optional object has a value. For example:
+
+```
+void f(std::optional<int> opt) {
+  DCHECK(opt.has_value());
+  use(*opt);
+}
+```
+
+##### Ensure that a value exists, then access the value in a correlated branch
+
+The check is aware of correlated branches in the code and can figure out when an optional object is ensured to have a value on all execution paths that lead to an access. For example:
+
+```
+void f(std::optional<int> opt) {
+  bool safe = false;
+  if (opt.has_value() && SomeOtherCondition()) {
+    safe = true;
+  }
+  // ... more code...
+  if (safe) {
+    use(*opt);
+  }
+}
+```
+
+#### Stabilize function results
+
+Since function results are not assumed to be stable across calls, it is best to store the result of the function call in a local variable and use that variable to access the value. For example:
+
+```
+void f(Foo foo) {
+  if (const auto& foo_opt = foo.opt(); foo_opt.has_value()) {
+    use(*foo_opt);
+  }
+}
+```
+
+#### Do not rely on uncommon-API invariants
+
+When uncommon APIs guarantee that an optional has contents, do not rely on it – instead, check explicitly that the optional object has a value. For example:
+
+```
+void f(Foo foo) {
+  if (const auto& property = foo.GetProperty("bar")) {
+    use(*property);
+  }
+}
+```
+
+instead of the HasProperty, GetProperty pairing we saw above.
+
+#### Do not rely on caller-performed checks
+
+If you know that all of a function’s callers have checked that an optional argument has a value, either change the function to take the value directly or check the optional again in the local scope of the callee. For example:
+
+```
+void g(int val) {
+  use(val);
+}
+
+void f(std::optional<int> opt) {
+  if (opt.has_value()) {
+    g(*opt);
+  }
+}
+```
+
+and
+
+```
+struct S {
+  std::optional<int> opt;
+  int x;
+};
+
+void g(const S &s) {
+  if (s.opt.has_value() && s.x > 10) {
+    use(*s.opt);
+}
+
+void f(S s) {
+  if (s.opt.has_value()) {
+    g(s);
+  }
+}
+```
+
+#### Additional notes
+
+##### Aliases created via `using` declarations
+
+The check is aware of aliases of optional types that are created via `using` declarations. For example:
+
+```
+using OptionalInt = std::optional<int>;
+
+void f(OptionalInt opt) {
+  use(opt.value()); // unsafe: it is unclear whether `opt` has a value.
+}
+```
+
+##### Lambdas
+
+The check does not currently report unsafe optional accesses in lambdas. A future version will expand the scope to lambdas, following the rules outlined above. It is best to follow the same principles when using optionals in lambdas.
+
+##### Access with `operator*()` vs. `value()`
+
+Given that `value()` has well-defined behavior (either throwing an exception or terminating the program), why treat it the same as `operator*()` which causes undefined behavior (UB)? That is, why is it considered unsafe to access an optional with `value()`, if it’s not provably populated with a value? For that matter, why is `CHECK()` followed by `operator*()` any better than `value()`, given that they are semantically equivalent (on configurations that disable exceptions)?
+
+The answer is that we assume most users do not realize the difference between `value()` and `operator*()`. Shifting to `operator*()` and some form of explicit value-presence check or explicit program termination has two advantages:
+
+- Readability. The check, and any potential side effects like program shutdown, are very clear in the code. Separating access from checks can actually make the checks more obvious.
+- Performance. A single check can cover many or even all accesses within scope. This gives the user the best of both worlds – the safety of a dynamic check, but without incurring redundant costs.
+
+### bugprone-undefined-memory-manipulation
+
+Finds calls of memory manipulation functions `memset()`, `memcpy()` and `memmove()` on non-TriviallyCopyable objects resulting in undefined behavior.
+
+Using memory manipulation functions on non-TriviallyCopyable objects can lead to a range of subtle and challenging issues in C++ code. The most immediate concern is the potential for undefined behavior, where the state of the object may become corrupted or invalid. This can manifest as crashes, data corruption, or unexpected behavior at runtime, making it challenging to identify and diagnose the root cause. Additionally, misuse of memory manipulation functions can bypass essential object-specific operations, such as constructors and destructors, leading to resource leaks or improper initialization.
+
+For example, when using `memcpy` to copy `std::string`, pointer data is being copied, and it can result in a double free issue.
+
+```
+#include <cstring>
+#include <string>
+
+int main() {
+    std::string source = "Hello";
+    std::string destination;
+
+    std::memcpy(&destination, &source, sizeof(std::string));
+
+    // Undefined behavior may occur here, during std::string destructor call.
+    return 0;
+}
+```
+
+### bugprone-undelegated-constructor
+
+Finds creation of temporary objects in constructors that look like a function call to another constructor of the same class.
+
+The user most likely meant to use a delegating constructor or base class initializer.
+
+### bugprone-unhandled-exception-at-new
+
+Finds calls to `new` with missing exception handler for `std::bad_alloc`.
+
+Calls to `new` may throw exceptions of type `std::bad_alloc` that should be handled. Alternatively, the nonthrowing form of `new` can be used. The check verifies that the exception is handled in the function that calls `new`.
+
+If a nonthrowing version is used or the exception is allowed to propagate out of the function no warning is generated.
+
+The exception handler is checked if it catches a `std::bad_alloc` or `std::exception` exception type, or all exceptions (catch-all). The check assumes that any user-defined `operator new` is either `noexcept` or may throw an exception of type `std::bad_alloc` (or one derived from it). Other exception class types are not taken into account.
+
+```
+int *f() noexcept {
+  int *p = new int[1000]; // warning: missing exception handler for allocation failure at 'new'
+  // ...
+  return p;
+}
+int *f1() { // not 'noexcept'
+  int *p = new int[1000]; // no warning: exception can be handled outside
+                          // of this function
+  // ...
+  return p;
+}
+
+int *f2() noexcept {
+  try {
+    int *p = new int[1000]; // no warning: exception is handled
+    // ...
+    return p;
+  } catch (std::bad_alloc &) {
+    // ...
+  }
+  // ...
+}
+
+int *f3() noexcept {
+  int *p = new (std::nothrow) int[1000]; // no warning: "nothrow" is used
+  // ...
+  return p;
+}
+```
+
+### bugprone-unhandled-self-assignment
+
+cert-oop54-cpp redirects here as an alias for this check. For the CERT alias, the WarnOnlyIfThisHasSuspiciousField option is set to false.
+
+Finds user-defined copy assignment operators which do not protect the code against self-assignment either by checking self-assignment explicitly or using the copy-and-swap or the copy-and-move method.
+
+By default, this check searches only those classes which have any pointer or C array field to avoid false positives. In case of a pointer or a C array, it’s likely that self-copy assignment breaks the object if the copy assignment operator was not written with care.
+
+See also: [OOP54-CPP. Gracefully handle self-copy assignment](https://wiki.sei.cmu.edu/confluence/display/cplusplus/OOP54-CPP.+Gracefully+handle+self-copy+assignment)
+
+A copy assignment operator must prevent that self-copy assignment ruins the object state. A typical use case is when the class has a pointer field and the copy assignment operator first releases the pointed object and then tries to assign it:
+
+```
+class T {
+int* p;
+
+public:
+  T(const T &rhs) : p(rhs.p ? new int(*rhs.p) : nullptr) {}
+  ~T() { delete p; }
+
+  // ...
+
+  T& operator=(const T &rhs) {
+    delete p;
+    p = new int(*rhs.p);
+    return *this;
+  }
+};
+```
+
+There are two common C++ patterns to avoid this problem. The first is the self-assignment check:
+
+```
+class T {
+int* p;
+
+public:
+  T(const T &rhs) : p(rhs.p ? new int(*rhs.p) : nullptr) {}
+  ~T() { delete p; }
+
+  // ...
+
+  T& operator=(const T &rhs) {
+    if(this == &rhs)
+      return *this;
+
+    delete p;
+    p = new int(*rhs.p);
+    return *this;
+  }
+};
+```
+
+The second one is the copy-and-swap method when we create a temporary copy (using the copy constructor) and then swap this temporary object with `this`:
+
+```
+class T {
+int* p;
+
+public:
+  T(const T &rhs) : p(rhs.p ? new int(*rhs.p) : nullptr) {}
+  ~T() { delete p; }
+
+  // ...
+
+  void swap(T &rhs) {
+    using std::swap;
+    swap(p, rhs.p);
+  }
+
+  T& operator=(const T &rhs) {
+    T(rhs).swap(*this);
+    return *this;
+  }
+};
+```
+
+There is a third pattern which is less common. Let’s call it the copy-and-move method when we create a temporary copy (using the copy constructor) and then move this temporary object into `this` (needs a move assignment operator):
+
+```
+class T {
+int* p;
+
+public:
+  T(const T &rhs) : p(rhs.p ? new int(*rhs.p) : nullptr) {}
+  ~T() { delete p; }
+
+  // ...
+
+  T& operator=(const T &rhs) {
+    T t = rhs;
+    *this = std::move(t);
+    return *this;
+  }
+
+  T& operator=(T &&rhs) {
+    p = rhs.p;
+    rhs.p = nullptr;
+    return *this;
+  }
+};
+```
+
+#### Options
+
+##### `WarnOnlyIfThisHasSuspiciousField`
+
+When true, the check will warn only if the container class of the copy assignment operator has any suspicious fields (pointer or C array). This option is set to true by default.
+
+### bugprone-unique-ptr-array-mismatch
+
+Finds initializations of C++ unique pointers to non-array type that are initialized with an array.
+
+If a pointer `std::unique_ptr<T>` is initialized with a new-expression `new T[]` the memory is not deallocated correctly. A plain `delete` is used in this case to deallocate the target memory. Instead a `delete[]` call is needed. A `std::unique_ptr<T[]>` uses the correct delete operator. The check does not emit warning if an `unique_ptr` with user-specified deleter type is used.
+
+The check offers replacement of `unique_ptr<T>` to `unique_ptr<T[]>` if it is used at a single variable declaration (one variable in one statement).
+
+Example:
+
+```
+std::unique_ptr<Foo> x(new Foo[10]); // -> std::unique_ptr<Foo[]> x(new Foo[10]);
+//                     ^ warning: unique pointer to non-array is initialized with array
+std::unique_ptr<Foo> x1(new Foo), x2(new Foo[10]); // no replacement
+//                                   ^ warning: unique pointer to non-array is initialized with array
+
+D d;
+std::unique_ptr<Foo, D> x3(new Foo[10], d); // no warning (custom deleter used)
+
+struct S {
+  std::unique_ptr<Foo> x(new Foo[10]); // no replacement in this case
+  //                     ^ warning: unique pointer to non-array is initialized with array
+};
+```
+
+This check partially covers the CERT C++ Coding Standard rule [MEM51-CPP. Properly deallocate dynamically allocated resources](https://wiki.sei.cmu.edu/confluence/display/cplusplus/MEM51-CPP.+Properly+deallocate+dynamically+allocated+resources) However, only the `std::unique_ptr` case is detected by this check.
+
+### bugprone-unsafe-functions
+
+Checks for functions that have safer, more secure replacements available, or are considered deprecated due to design flaws. The check heavily relies on the functions from the **Annex K.** “Bounds-checking interfaces” of C11.
+
+The check implements the following rules from the CERT C Coding Standard:
+
+- Recommendation [MSC24-C. Do not use deprecated or obsolescent functions](https://wiki.sei.cmu.edu/confluence/display/c/MSC24-C.+Do+not+use+deprecated+or+obsolescent+functions).
+- Rule [MSC33-C. Do not pass invalid data to the asctime() function](https://wiki.sei.cmu.edu/confluence/display/c/MSC33-C.+Do+not+pass+invalid+data+to+the+asctime()+function).
+
+cert-msc24-c and cert-msc33-c redirect here as aliases of this check.
+
+#### Unsafe functions
+
+If *Annex K.* is available, a replacement from *Annex K.* is suggested for the following functions:
+
+`asctime`, `asctime_r`, `bsearch`, `ctime`, `fopen`, `fprintf`, `freopen`, `fscanf`, `fwprintf`, `fwscanf`, `getenv`, `gets`, `gmtime`, `localtime`, `mbsrtowcs`, `mbstowcs`, `memcpy`, `memmove`, `memset`, `printf`, `qsort`, `scanf`, `snprintf`, `sprintf`, `sscanf`, `strcat`, `strcpy`, `strerror`, `strlen`, `strncat`, `strncpy`, `strtok`, `swprintf`, `swscanf`, `vfprintf`, `vfscanf`, `vfwprintf`, `vfwscanf`, `vprintf`, `vscanf`, `vsnprintf`, `vsprintf`, `vsscanf`, `vswprintf`, `vswscanf`, `vwprintf`, `vwscanf`, `wcrtomb`, `wcscat`, `wcscpy`, `wcslen`, `wcsncat`, `wcsncpy`, `wcsrtombs`, `wcstok`, `wcstombs`, `wctomb`, `wmemcpy`, `wmemmove`, `wprintf`, `wscanf`.
+
+If *Annex K.* is not available, replacements are suggested only for the following functions from the previous list:
+
+> - `asctime`, `asctime_r`, suggested replacement: `strftime`
+> - `gets`, suggested replacement: `fgets`
+
+The following functions are always checked, regardless of *Annex K* availability:
+
+> - `rewind`, suggested replacement: `fseek`
+> - `setbuf`, suggested replacement: `setvbuf`
+
+If [ReportMoreUnsafeFunctions](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/unsafe-functions.html#cmdoption-arg-ReportMoreUnsafeFunctions) is enabled, the following functions are also checked:
+
+> - `bcmp`, suggested replacement: `memcmp`
+> - `bcopy`, suggested replacement: `memcpy_s` if *Annex K* is available, or `memcpy`
+> - `bzero`, suggested replacement: `memset_s` if *Annex K* is available, or `memset`
+> - `getpw`, suggested replacement: `getpwuid`
+> - `vfork`, suggested replacement: `posix_spawn`
+
+Although mentioned in the associated CERT rules, the following functions are **ignored** by the check:
+
+`atof`, `atoi`, `atol`, `atoll`, `tmpfile`.
+
+The availability of *Annex K* is determined based on the following macros:
+
+> - `__STDC_LIB_EXT1__`: feature macro, which indicates the presence of *Annex K. “Bounds-checking interfaces”* in the library implementation
+> - `__STDC_WANT_LIB_EXT1__`: user-defined macro, which indicates that the user requests the functions from *Annex K.* to be defined.
+
+Both macros have to be defined to suggest replacement functions from *Annex K.* `__STDC_LIB_EXT1__` is defined by the library implementation, and `__STDC_WANT_LIB_EXT1__` must be defined to `1` by the user **before** including any system headers.
+
+#### Options
+
+##### `ReportMoreUnsafeFunctions`
+
+When true, additional functions from widely used APIs (such as POSIX) are added to the list of reported functions. See the main documentation of the check for the complete list as to what this option enables. Default is true.
+
+#### Examples
+
+```
+#ifndef __STDC_LIB_EXT1__
+#error "Annex K is not supported by the current standard library implementation."
+#endif
+
+#define __STDC_WANT_LIB_EXT1__ 1
+
+#include <string.h> // Defines functions from Annex K.
+#include <stdio.h>
+
+enum { BUFSIZE = 32 };
+
+void Unsafe(const char *Msg) {
+  static const char Prefix[] = "Error: ";
+  static const char Suffix[] = "\n";
+  char Buf[BUFSIZE] = {0};
+
+  strcpy(Buf, Prefix); // warning: function 'strcpy' is not bounds-checking; 'strcpy_s' should be used instead.
+  strcat(Buf, Msg);    // warning: function 'strcat' is not bounds-checking; 'strcat_s' should be used instead.
+  strcat(Buf, Suffix); // warning: function 'strcat' is not bounds-checking; 'strcat_s' should be used instead.
+  if (fputs(buf, stderr) < 0) {
+    // error handling
+    return;
+  }
+}
+
+void UsingSafeFunctions(const char *Msg) {
+  static const char Prefix[] = "Error: ";
+  static const char Suffix[] = "\n";
+  char Buf[BUFSIZE] = {0};
+
+  if (strcpy_s(Buf, BUFSIZE, Prefix) != 0) {
+    // error handling
+    return;
+  }
+
+  if (strcat_s(Buf, BUFSIZE, Msg) != 0) {
+    // error handling
+    return;
+  }
+
+  if (strcat_s(Buf, BUFSIZE, Suffix) != 0) {
+    // error handling
+    return;
+  }
+
+  if (fputs(Buf, stderr) < 0) {
+    // error handling
+    return;
+  }
+}
+```
+
+### bugprone-unused-raii
+
+Finds temporaries that look like RAII objects.
+
+The canonical example for this is a scoped lock.
+
+```
+{
+  scoped_lock(&global_mutex);
+  critical_section();
+}
+```
+
+The destructor of the scoped_lock is called before the `critical_section` is entered, leaving it unprotected.
+
+We apply a number of heuristics to reduce the false positive count of this check:
+
+- Ignore code expanded from macros. Testing frameworks make heavy use of this.
+- Ignore types with trivial destructors. They are very unlikely to be RAII objects and there’s no difference when they are deleted.
+- Ignore objects at the end of a compound statement (doesn’t change behavior).
+- Ignore objects returned from a call.
+
+### bugprone-unused-return-value
+
+Warns on unused function return values. The checked functions can be configured.
+
+#### Options
+
+##### `CheckedFunctions`
+
+Semicolon-separated list of functions to check. The function is checked if the name and scope matches, with any arguments. By default the following functions are checked: `std::async, std::launder, std::remove, std::remove_if, std::unique, std::unique_ptr::release, std::basic_string::empty, std::vector::empty, std::back_inserter, std::distance, std::find, std::find_if, std::inserter, std::lower_bound, std::make_pair, std::map::count, std::map::find, std::map::lower_bound, std::multimap::equal_range, std::multimap::upper_bound, std::set::count, std::set::find, std::setfill, std::setprecision, std::setw, std::upper_bound, std::vector::at, bsearch, ferror, feof, isalnum, isalpha, isblank, iscntrl, isdigit, isgraph, islower, isprint, ispunct, isspace, isupper, iswalnum, iswprint, iswspace, isxdigit, memchr, memcmp, strcmp, strcoll, strncmp, strpbrk, strrchr, strspn, strstr, wcscmp, access, bind, connect, difftime, dlsym, fnmatch, getaddrinfo, getopt, htonl, htons, iconv_open, inet_addr, isascii, isatty, mmap, newlocale, openat, pathconf, pthread_equal, pthread_getspecific, pthread_mutex_trylock, readdir, readlink, recvmsg, regexec, scandir, semget, setjmp, shm_open, shmget, sigismember, strcasecmp, strsignal, ttyname``std::async()`. Not using the return value makes the call synchronous.`std::launder()`. Not using the return value usually means that the function interface was misunderstood by the programmer. Only the returned pointer is “laundered”, not the argument.`std::remove()`, `std::remove_if()` and `std::unique()`. The returned iterator indicates the boundary between elements to keep and elements to be removed. Not using the return value means that the information about which elements to remove is lost.`std::unique_ptr::release()`. Not using the return value can lead to resource leaks if the same pointer isn’t stored anywhere else. Often, ignoring the `release()` return value indicates that the programmer confused the function with `reset()`.`std::basic_string::empty()` and `std::vector::empty()`. Not using the return value often indicates that the programmer confused the function with `clear()`.
+
+##### `CheckedReturnTypes`
+
+Semicolon-separated list of function return types to check.
+
+By default the following function return types are checked: ::std::error_code, ::std::error_condition, ::std::errc, ::std::expected, ::boost::system::error_code.
+
+##### `AllowCastToVoid`
+
+Controls whether casting return values to `void` is permitted.
+
+Default: false.
+
+[cert-err33-c](https://clang.llvm.org/extra/clang-tidy/checks/cert/err33-c.html) is an alias of this check that checks a fixed and large set of standard library functions.
+
+### bugprone-use-after-move
+
+Warns if an object is used after it has been moved, for example:
+
+```
+std::string str = "Hello, world!\n";
+std::vector<std::string> messages;
+messages.emplace_back(std::move(str));
+std::cout << str;
+```
+
+The last line will trigger a warning that `str` is used after it has been moved.
+
+The check does not trigger a warning if the object is reinitialized after the move and before the use. For example, no warning will be output for this code:
+
+```
+messages.emplace_back(std::move(str));
+str = "Greetings, stranger!\n";
+std::cout << str;
+```
+
+Subsections below explain more precisely what exactly the check considers to be a move, use, and reinitialization.
+
+The check takes control flow into account. A warning is only emitted if the use can be reached from the move. This means that the following code does not produce a warning:
+
+```
+if (condition) {
+  messages.emplace_back(std::move(str));
+} else {
+  std::cout << str;
+}
+```
+
+On the other hand, the following code does produce a warning:
+
+```
+for (int i = 0; i < 10; ++i) {
+  std::cout << str;
+  messages.emplace_back(std::move(str));
+}
+```
+
+(The use-after-move happens on the second iteration of the loop.)
+
+In some cases, the check may not be able to detect that two branches are mutually exclusive. For example (assuming that `i` is an int):
+
+```
+if (i == 1) {
+  messages.emplace_back(std::move(str));
+}
+if (i == 2) {
+  std::cout << str;
+}
+```
+
+In this case, the check will erroneously produce a warning, even though it is not possible for both the move and the use to be executed. More formally, the analysis is [flow-sensitive but not path-sensitive](https://en.wikipedia.org/wiki/Data-flow_analysis#Sensitivities).
+
+#### Silencing erroneous warnings
+
+An erroneous warning can be silenced by reinitializing the object after the move:
+
+```
+if (i == 1) {
+  messages.emplace_back(std::move(str));
+  str = "";
+}
+if (i == 2) {
+  std::cout << str;
+}
+```
+
+If you want to avoid the overhead of actually reinitializing the object, you can create a dummy function that causes the check to assume the object was reinitialized:
+
+```
+template <class T>
+void IS_INITIALIZED(T&) {}
+```
+
+You can use this as follows:
+
+```
+if (i == 1) {
+  messages.emplace_back(std::move(str));
+}
+if (i == 2) {
+  IS_INITIALIZED(str);
+  std::cout << str;
+}
+```
+
+The check will not output a warning in this case because passing the object to a function as a non-const pointer or reference counts as a reinitialization (see section [Reinitialization](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/use-after-move.html#reinitialization) below).
+
+#### Unsequenced moves, uses, and reinitializations
+
+In many cases, C++ does not make any guarantees about the order in which sub-expressions of a statement are evaluated. This means that in code like the following, it is not guaranteed whether the use will happen before or after the move:
+
+```
+void f(int i, std::vector<int> v);
+std::vector<int> v = { 1, 2, 3 };
+f(v[1], std::move(v));
+```
+
+In this kind of situation, the check will note that the use and move are unsequenced.
+
+The check will also take sequencing rules into account when reinitializations occur in the same statement as moves or uses. A reinitialization is only considered to reinitialize a variable if it is guaranteed to be evaluated after the move and before the use.
+
+#### Move
+
+The check currently only considers calls of `std::move` on local variables or function parameters. It does not check moves of member variables or global variables.
+
+Any call of `std::move` on a variable is considered to cause a move of that variable, even if the result of `std::move` is not passed to an rvalue reference parameter.
+
+This means that the check will flag a use-after-move even on a type that does not define a move constructor or move assignment operator. This is intentional. Developers may use `std::move` on such a type in the expectation that the type will add move semantics in the future. If such a `std::move` has the potential to cause a use-after-move, we want to warn about it even if the type does not implement move semantics yet.
+
+Furthermore, if the result of `std::move` *is* passed to an rvalue reference parameter, this will always be considered to cause a move, even if the function that consumes this parameter does not move from it, or if it does so only conditionally. For example, in the following situation, the check will assume that a move always takes place:
+
+```
+std::vector<std::string> messages;
+void f(std::string &&str) {
+  // Only remember the message if it isn't empty.
+  if (!str.empty()) {
+    messages.emplace_back(std::move(str));
+  }
+}
+std::string str = "";
+f(std::move(str));
+```
+
+The check will assume that the last line causes a move, even though, in this particular case, it does not. Again, this is intentional.
+
+There is one special case: A call to `std::move` inside a `try_emplace` call is conservatively assumed not to move. This is to avoid spurious warnings, as the check has no way to reason about the `bool` returned by `try_emplace`.
+
+When analyzing the order in which moves, uses and reinitializations happen (see section [Unsequenced moves, uses, and reinitializations](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/use-after-move.html#unsequenced-moves-uses-and-reinitializations)), the move is assumed to occur in whichever function the result of the `std::move` is passed to.
+
+#### Use
+
+Any occurrence of the moved variable that is not a reinitialization (see below) is considered to be a use.
+
+An exception to this are objects of type `std::unique_ptr`, `std::shared_ptr` and `std::weak_ptr`, which have defined move behavior (objects of these classes are guaranteed to be empty after they have been moved from). Therefore, an object of these classes will only be considered to be used if it is dereferenced, i.e. if `operator*`, `operator->` or `operator[]` (in the case of `std::unique_ptr<T []>`) is called on it.
+
+If multiple uses occur after a move, only the first of these is flagged.
+
+#### Reinitialization
+
+The check considers a variable to be reinitialized in the following cases:
+
+- The variable occurs on the left-hand side of an assignment.
+- The variable is passed to a function as a non-const pointer or non-const lvalue reference. (It is assumed that the variable may be an out-parameter for the function.)
+- `clear()` or `assign()` is called on the variable and the variable is of one of the standard container types `basic_string`, `vector`, `deque`, `forward_list`, `list`, `set`, `map`, `multiset`, `multimap`, `unordered_set`, `unordered_map`, `unordered_multiset`, `unordered_multimap`.
+- `reset()` is called on the variable and the variable is of type `std::unique_ptr`, `std::shared_ptr` or `std::weak_ptr`.
+- A member function marked with the `[[clang::reinitializes]]` attribute is called on the variable.
+
+If the variable in question is a struct and an individual member variable of that struct is written to, the check does not consider this to be a reinitialization – even if, eventually, all member variables of the struct are written to. For example:
+
+```
+struct S {
+  std::string str;
+  int i;
+};
+S s = { "Hello, world!\n", 42 };
+S s_other = std::move(s);
+s.str = "Lorem ipsum";
+s.i = 99;
+```
+
+The check will not consider `s` to be reinitialized after the last line; instead, the line that assigns to `s.str` will be flagged as a use-after-move. This is intentional as this pattern of reinitializing a struct is error-prone. For example, if an additional member variable is added to `S`, it is easy to forget to add the reinitialization for this additional member. Instead, it is safer to assign to the entire struct in one go, and this will also avoid the use-after-move warning.
+
+### bugprone-virtual-near-miss
+
+Warn if a function is a near miss (i.e. the name is very similar and the function signature is the same) to a virtual function from a base class.
+
+Example:
+
+```
+struct Base {
+  virtual void func();
+};
+
+struct Derived : Base {
+  virtual void funk();
+  // warning: 'Derived::funk' has a similar name and the same signature as virtual method 'Base::func'; did you mean to override it?
+};
+```
+
 ## cert-*
 
 Checks related to CERT Secure Coding Guidelines.
@@ -2505,6 +4700,80 @@ Checks that advocate usage of modern (currently “modern” means “C++11”) 
 
 >支持使用现代（目前“现代”指的是“C++ 11”及以后版本）语言结构的检查。
 
+### modernize-avoid-bind
+
+The check finds uses of `std::bind` and `boost::bind` and replaces them with lambdas. Lambdas will use value-capture unless reference capture is explicitly requested with `std::ref` or `boost::ref`.
+
+It supports arbitrary callables including member functions, function objects, and free functions, and all variations thereof. Anything that you can pass to the first argument of `bind` should be diagnosable. Currently, the only known case where a fix-it is unsupported is when the same placeholder is specified multiple times in the parameter list.
+
+Given:
+
+```
+int add(int x, int y) { return x + y; }
+```
+
+Then:
+
+```
+void f() {
+  int x = 2;
+  auto clj = std::bind(add, x, _1);
+}
+```
+
+is replaced by:
+
+```
+void f() {
+  int x = 2;
+  auto clj = [=](auto && arg1) { return add(x, arg1); };
+}
+```
+
+`std::bind` can be hard to read and can result in larger object files and binaries due to type information that will not be produced by equivalent lambdas.
+
+#### Options
+
+##### `PermissiveParameterList`
+
+If the option is set to true, the check will append `auto&&...` to the end of every placeholder parameter list. Without this, it is possible for a fix-it to perform an incorrect transformation in the case where the result of the `bind` is used in the context of a type erased functor such as `std::function` which allows mismatched arguments. For example:
+
+```
+int add(int x, int y) { return x + y; }
+int foo() {
+  std::function<int(int,int)> ignore_args = std::bind(add, 2, 2);
+  return ignore_args(3, 3);
+}
+```
+
+is valid code, and returns 4. The actual values passed to `ignore_args` are simply ignored.
+
+Without `PermissiveParameterList`, this would be transformed into
+
+```
+int add(int x, int y) { return x + y; }
+int foo() {
+  std::function<int(int,int)> ignore_args = [] { return add(2, 2); }
+  return ignore_args(3, 3);
+}
+```
+
+which will not compile, since the lambda does not contain an `operator()` that accepts 2 arguments.
+
+With permissive parameter list, it instead generates
+
+```
+int add(int x, int y) { return x + y; }
+int foo() {
+  std::function<int(int,int)> ignore_args = [](auto&&...) { return add(2, 2); }
+  return ignore_args(3, 3);
+}
+```
+
+which is correct.
+
+This check requires using C++14 or higher to run.
+
 ### modernize-avoid-c-arrays
 
 cppcoreguidelines-avoid-c-arrays redirects here as an alias for this check.
@@ -2554,6 +4823,889 @@ inline void bar() {
 
 Similarly, the `main()` function is ignored. Its second and third parameters can be either `char* argv[]` or `char** argv`, but cannot be `std::array<>`.
 
+### modernize-concat-nested-namespaces
+
+Checks for use of nested namespaces such as `namespace a { namespace b { ... } }` and suggests changing to the more concise syntax introduced in C++17: `namespace a::b { ... }`. Inline namespaces are not modified.
+
+For example:
+
+```
+namespace n1 {
+namespace n2 {
+    void t();
+}
+}
+
+namespace n3 {
+namespace n4 {
+namespace n5 {
+    void t();
+}
+}
+namespace n6 {
+namespace n7 {
+    void t();
+}
+}
+}
+
+// in c++20
+namespace n8 {
+inline namespace n9 {
+    void t();
+}
+}
+```
+
+Will be modified to:
+
+```
+namespace n1::n2 {
+    void t();
+}
+
+namespace n3 {
+namespace n4::n5 {
+    void t();
+}
+namespace n6::n7 {
+    void t();
+}
+}
+
+// in c++20
+namespace n8::inline n9 {
+    void t();
+}
+```
+
+### modernize-deprecated-headers
+
+Some headers from C library were deprecated in C++ and are no longer welcome in C++ codebases. Some have no effect in C++. For more details refer to the C++ 14 Standard [depr.c.headers] section.
+
+This check replaces C standard library headers with their C++ alternatives and removes redundant ones.
+
+```
+// C++ source file...
+#include <assert.h>
+#include <stdbool.h>
+
+// becomes
+
+#include <cassert>
+// No 'stdbool.h' here.
+```
+
+Important note: the Standard doesn’t guarantee that the C++ headers declare all the same functions in the global namespace. The check in its current form can break the code that uses library symbols from the global namespace.
+
+- <assert.h>
+- <complex.h>
+- <ctype.h>
+- <errno.h>
+- <fenv.h> // deprecated since C++11
+- <float.h>
+- <inttypes.h>
+- <limits.h>
+- <locale.h>
+- <math.h>
+- <setjmp.h>
+- <signal.h>
+- <stdarg.h>
+- <stddef.h>
+- <stdint.h>
+- <stdio.h>
+- <stdlib.h>
+- <string.h>
+- <tgmath.h> // deprecated since C++11
+- <time.h>
+- <uchar.h> // deprecated since C++11
+- <wchar.h>
+- <wctype.h>
+
+If the specified standard is older than C++11 the check will only replace headers deprecated before C++11, otherwise – every header that appeared in the previous list.
+
+These headers don’t have effect in C++:
+
+- <iso646.h>
+- <stdalign.h>
+- <stdbool.h>
+
+The checker ignores include directives within extern “C” { … } blocks, since a library might want to expose some API for C and C++ libraries.
+
+```
+// C++ source file...
+extern "C" {
+#include <assert.h>  // Left intact.
+#include <stdbool.h> // Left intact.
+}
+```
+
+#### Options
+
+##### `CheckHeaderFile`
+
+clang-tidy cannot know if the header file included by the currently analyzed C++ source file is not included by any other C source files. Hence, to omit false-positives and wrong fixit-hints, we ignore emitting reports into header files. One can set this option to true if they know that the header files in the project are only used by C++ source file. Default is false.
+
+### modernize-deprecated-ios-base-aliases
+
+Detects usage of the deprecated member types of `std::ios_base` and replaces those that have a non-deprecated equivalent.
+
+| Deprecated member type     | Replacement               |
+| :------------------------- | :------------------------ |
+| `std::ios_base::io_state`  | `std::ios_base::iostate`  |
+| `std::ios_base::open_mode` | `std::ios_base::openmode` |
+| `std::ios_base::seek_dir`  | `std::ios_base::seekdir`  |
+| `std::ios_base::streamoff` |                           |
+| `std::ios_base::streampos` |                           |
+
+### modernize-loop-convert
+
+This check converts `for(...; ...; ...)` loops to use the new range-based loops in C++11.
+
+Three kinds of loops can be converted:
+
+- Loops over statically allocated arrays.
+- Loops over containers, using iterators.
+- Loops over array-like containers, using `operator[]` and `at()`.
+
+#### MinConfidence option
+
+##### risky
+
+In loops where the container expression is more complex than just a reference to a declared expression (a variable, function, enum, etc.), and some part of it appears elsewhere in the loop, we lower our confidence in the transformation due to the increased risk of changing semantics. Transformations for these loops are marked as risky, and thus will only be converted if the minimum required confidence level is set to risky.
+
+```
+int arr[10][20];
+int l = 5;
+
+for (int j = 0; j < 20; ++j)
+  int k = arr[l][j] + l; // using l outside arr[l] is considered risky
+
+for (int i = 0; i < obj.getVector().size(); ++i)
+  obj.foo(10); // using 'obj' is considered risky
+```
+
+See [Range-based loops evaluate end() only once](https://clang.llvm.org/extra/clang-tidy/checks/modernize/loop-convert.html#incorrectriskytransformation) for an example of an incorrect transformation when the minimum required confidence level is set to risky.
+
+##### reasonable (Default)
+
+If a loop calls `.end()` or `.size()` after each iteration, the transformation for that loop is marked as reasonable, and thus will be converted if the required confidence level is set to reasonable (default) or lower.
+
+```
+// using size() is considered reasonable
+for (int i = 0; i < container.size(); ++i)
+  cout << container[i];
+```
+
+##### safe
+
+Any other loops that do not match the above criteria to be marked as risky or reasonable are marked safe, and thus will be converted if the required confidence level is set to safe or lower.
+
+```
+int arr[] = {1,2,3};
+
+for (int i = 0; i < 3; ++i)
+  cout << arr[i];
+```
+
+#### Example
+
+Original:
+
+```
+const int N = 5;
+int arr[] = {1,2,3,4,5};
+vector<int> v;
+v.push_back(1);
+v.push_back(2);
+v.push_back(3);
+
+// safe conversion
+for (int i = 0; i < N; ++i)
+  cout << arr[i];
+
+// reasonable conversion
+for (vector<int>::iterator it = v.begin(); it != v.end(); ++it)
+  cout << *it;
+
+// reasonable conversion
+for (vector<int>::iterator it = begin(v); it != end(v); ++it)
+  cout << *it;
+
+// reasonable conversion
+for (vector<int>::iterator it = std::begin(v); it != std::end(v); ++it)
+  cout << *it;
+
+// reasonable conversion
+for (int i = 0; i < v.size(); ++i)
+  cout << v[i];
+
+// reasonable conversion
+for (int i = 0; i < size(v); ++i)
+  cout << v[i];
+```
+
+After applying the check with minimum confidence level set to reasonable (default):
+
+```
+const int N = 5;
+int arr[] = {1,2,3,4,5};
+vector<int> v;
+v.push_back(1);
+v.push_back(2);
+v.push_back(3);
+
+// safe conversion
+for (auto & elem : arr)
+  cout << elem;
+
+// reasonable conversion
+for (auto & elem : v)
+  cout << elem;
+
+// reasonable conversion
+for (auto & elem : v)
+  cout << elem;
+```
+
+#### Reverse Iterator Support
+
+The converter is also capable of transforming iterator loops which use `rbegin` and `rend` for looping backwards over a container. Out of the box this will automatically happen in C++20 mode using the `ranges` library, however the check can be configured to work without C++20 by specifying a function to reverse a range and optionally the header file where that function lives.
+
+##### `UseCxx20ReverseRanges`
+
+When set to true convert loops when in C++20 or later mode using `std::ranges::reverse_view`. Default value is `true`.
+
+##### `MakeReverseRangeFunction`
+
+Specify the function used to reverse an iterator pair, the function should accept a class with `rbegin` and `rend` methods and return a class with `begin` and `end` methods that call the `rbegin` and `rend` methods respectively. Common examples are `ranges::reverse_view` and `llvm::reverse`. Default value is an empty string.
+
+##### `MakeReverseRangeHeader`
+
+Specifies the header file where [`MakeReverseRangeFunction`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/loop-convert.html#cmdoption-arg-MakeReverseRangeFunction) is declared. For the previous examples this option would be set to `range/v3/view/reverse.hpp` and `llvm/ADT/STLExtras.h` respectively. If this is an empty string and [`MakeReverseRangeFunction`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/loop-convert.html#cmdoption-arg-MakeReverseRangeFunction) is set, the check will proceed on the assumption that the function is already available in the translation unit. This can be wrapped in angle brackets to signify to add the include as a system include. Default value is an empty string.
+
+##### `IncludeStyle`
+
+A string specifying which include-style is used, llvm or google. Default is llvm.
+
+#### Limitations
+
+There are certain situations where the tool may erroneously perform transformations that remove information and change semantics. Users of the tool should be aware of the behavior and limitations of the check outlined by the cases below.
+
+##### Comments inside loop headers
+
+Comments inside the original loop header are ignored and deleted when transformed.
+
+```
+for (int i = 0; i < N; /* This will be deleted */ ++i) { }
+```
+
+##### Range-based loops evaluate end() only once
+
+The C++11 range-based for loop calls `.end()` only once during the initialization of the loop. If in the original loop `.end()` is called after each iteration the semantics of the transformed loop may differ.
+
+```
+// The following is semantically equivalent to the C++11 range-based for loop,
+// therefore the semantics of the header will not change.
+for (iterator it = container.begin(), e = container.end(); it != e; ++it) { }
+
+// Instead of calling .end() after each iteration, this loop will be
+// transformed to call .end() only once during the initialization of the loop,
+// which may affect semantics.
+for (iterator it = container.begin(); it != container.end(); ++it) { }
+```
+
+As explained above, calling member functions of the container in the body of the loop is considered risky. If the called member function modifies the container the semantics of the converted loop will differ due to `.end()` being called only once.
+
+```
+bool flag = false;
+for (vector<T>::iterator it = vec.begin(); it != vec.end(); ++it) {
+  // Add a copy of the first element to the end of the vector.
+  if (!flag) {
+    // This line makes this transformation 'risky'.
+    vec.push_back(*it);
+    flag = true;
+  }
+  cout << *it;
+}
+```
+
+The original code above prints out the contents of the container including the newly added element while the converted loop, shown below, will only print the original contents and not the newly added element.
+
+```
+bool flag = false;
+for (auto & elem : vec) {
+  // Add a copy of the first element to the end of the vector.
+  if (!flag) {
+    // This line makes this transformation 'risky'
+    vec.push_back(elem);
+    flag = true;
+  }
+  cout << elem;
+}
+```
+
+Semantics will also be affected if `.end()` has side effects. For example, in the case where calls to `.end()` are logged the semantics will change in the transformed loop if `.end()` was originally called after each iteration.
+
+```
+iterator end() {
+  num_of_end_calls++;
+  return container.end();
+}
+```
+
+##### Overloaded operator->() with side effects
+
+Similarly, if `operator->()` was overloaded to have side effects, such as logging, the semantics will change. If the iterator’s `operator->()` was used in the original loop it will be replaced with `<container element>.<member>` instead due to the implicit dereference as part of the range-based for loop. Therefore any side effect of the overloaded `operator->()` will no longer be performed.
+
+```
+for (iterator it = c.begin(); it != c.end(); ++it) {
+  it->func(); // Using operator->()
+}
+// Will be transformed to:
+for (auto & elem : c) {
+  elem.func(); // No longer using operator->()
+}
+```
+
+##### Pointers and references to containers
+
+While most of the check’s risk analysis is dedicated to determining whether the iterator or container was modified within the loop, it is possible to circumvent the analysis by accessing and modifying the container through a pointer or reference.
+
+If the container were directly used instead of using the pointer or reference the following transformation would have only been applied at the risky level since calling a member function of the container is considered risky. The check cannot identify expressions associated with the container that are different than the one used in the loop header, therefore the transformation below ends up being performed at the safe level.
+
+```
+vector<int> vec;
+
+vector<int> *ptr = &vec;
+vector<int> &ref = vec;
+
+for (vector<int>::iterator it = vec.begin(), e = vec.end(); it != e; ++it) {
+  if (!flag) {
+    // Accessing and modifying the container is considered risky, but the risk
+    // level is not raised here.
+    ptr->push_back(*it);
+    ref.push_back(*it);
+    flag = true;
+  }
+}
+```
+
+##### OpenMP
+
+As range-based for loops are only available since OpenMP 5, this check should not be used on code with a compatibility requirement of OpenMP prior to version 5. It is **intentional** that this check does not make any attempts to exclude incorrect diagnostics on OpenMP for loops prior to OpenMP 5.
+
+To prevent this check to be applied (and to break) OpenMP for loops but still be applied to non-OpenMP for loops the usage of `NOLINT` (see [Suppressing Undesired Diagnostics](https://clang.llvm.org/extra/clang-tidy/index.html#clang-tidy-nolint)) on the specific for loops is recommended.
+
+### modernize-macro-to-enum
+
+Replaces groups of adjacent macros with an unscoped anonymous enum. Using an unscoped anonymous enum ensures that everywhere the macro token was used previously, the enumerator name may be safely used.
+
+This check can be used to enforce the C++ core guideline [Enum.1: Prefer enumerations over macros](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#enum1-prefer-enumerations-over-macros), within the constraints outlined below.
+
+Potential macros for replacement must meet the following constraints:
+
+- Macros must expand only to integral literal tokens or expressions of literal tokens. The expression may contain any of the unary operators `-`, `+`, `~` or `!`, any of the binary operators `,`, `-`, `+`, `*`, `/`, `%`, `&`, `|`, `^`, `<`, `>`, `<=`, `>=`, `==`, `!=`, `||`, `&&`, `<<`, `>>` or `<=>`, the ternary operator `?:` and its [GNU extension](https://gcc.gnu.org/onlinedocs/gcc/Conditionals.html). Parenthesized expressions are also recognized. This recognizes most valid expressions. In particular, expressions with the `sizeof` operator are not recognized.
+- Macros must be defined on sequential source file lines, or with only comment lines in between macro definitions.
+- Macros must all be defined in the same source file.
+- Macros must not be defined within a conditional compilation block. (Conditional include guards are exempt from this constraint.)
+- Macros must not be defined adjacent to other preprocessor directives.
+- Macros must not be used in any conditional preprocessing directive.
+- Macros must not be used as arguments to other macros.
+- Macros must not be undefined.
+- Macros must be defined at the top-level, not inside any declaration or definition.
+
+Each cluster of macros meeting the above constraints is presumed to be a set of values suitable for replacement by an anonymous enum. From there, a developer can give the anonymous enum a name and continue refactoring to a scoped enum if desired. Comments on the same line as a macro definition or between subsequent macro definitions are preserved in the output. No formatting is assumed in the provided replacements, although clang-tidy can optionally format all fixes.
+
+#### Warning
+
+Initializing expressions are assumed to be valid initializers for an enum. C requires that enum values fit into an `int`, but this may not be the case for some accepted constant expressions. For instance `1 << 40` will not fit into an `int` when the size of an `int` is 32 bits.
+
+#### Examples
+
+```
+#define RED   0xFF0000
+#define GREEN 0x00FF00
+#define BLUE  0x0000FF
+
+#define TM_NONE (-1) // No method selected.
+#define TM_ONE 1    // Use tailored method one.
+#define TM_TWO 2    // Use tailored method two.  Method two
+                    // is preferable to method one.
+#define TM_THREE 3  // Use tailored method three.
+```
+
+becomes
+
+```
+enum {
+RED = 0xFF0000,
+GREEN = 0x00FF00,
+BLUE = 0x0000FF
+};
+
+enum {
+TM_NONE = (-1), // No method selected.
+TM_ONE = 1,    // Use tailored method one.
+TM_TWO = 2,    // Use tailored method two.  Method two
+                    // is preferable to method one.
+TM_THREE = 3  // Use tailored method three.
+};
+```
+
+### modernize-make-shared
+
+This check finds the creation of `std::shared_ptr` objects by explicitly calling the constructor and a `new` expression, and replaces it with a call to `std::make_shared`.
+
+```
+auto my_ptr = std::shared_ptr<MyPair>(new MyPair(1, 2));
+
+// becomes
+
+auto my_ptr = std::make_shared<MyPair>(1, 2);
+```
+
+This check also finds calls to `std::shared_ptr::reset()` with a `new` expression, and replaces it with a call to `std::make_shared`.
+
+```
+my_ptr.reset(new MyPair(1, 2));
+
+// becomes
+
+my_ptr = std::make_shared<MyPair>(1, 2);
+```
+
+#### Options
+
+##### `MakeSmartPtrFunction`
+
+A string specifying the name of make-shared-ptr function.
+
+Default is std::make_shared.
+
+##### `MakeSmartPtrFunctionHeader`
+
+A string specifying the corresponding header of make-shared-ptr function.
+
+Default is memory.
+
+##### IncludeStyle
+
+A string specifying which include-style is used, llvm or google.
+
+Default is llvm.
+
+##### `IgnoreMacros`
+
+If set to true, the check will not give warnings inside macros.
+
+Default is true.
+
+##### `IgnoreDefaultInitialization`
+
+If set to non-zero, the check does not suggest edits that will transform default initialization into value initialization, as this can cause performance regressions.
+
+Default is 1.
+
+### modernize-make-unique
+
+This check finds the creation of `std::unique_ptr` objects by explicitly calling the constructor and a `new` expression, and replaces it with a call to `std::make_unique`, introduced in C++14.
+
+```
+auto my_ptr = std::unique_ptr<MyPair>(new MyPair(1, 2));
+
+// becomes
+
+auto my_ptr = std::make_unique<MyPair>(1, 2);
+```
+
+This check also finds calls to `std::unique_ptr::reset()` with a `new` expression, and replaces it with a call to `std::make_unique`.
+
+```
+my_ptr.reset(new MyPair(1, 2));
+
+// becomes
+
+my_ptr = std::make_unique<MyPair>(1, 2);
+```
+
+#### Options
+
+##### `MakeSmartPtrFunction`
+
+A string specifying the name of make-unique-ptr function.
+
+Default is std::make_unique.
+
+##### `MakeSmartPtrFunctionHeader`
+
+A string specifying the corresponding header of make-unique-ptr function.
+
+Default is <memory>.
+
+##### `IncludeStyle`
+
+A string specifying which include-style is used, llvm or google.
+
+Default is llvm.
+
+##### `IgnoreMacros`
+
+If set to true, the check will not give warnings inside macros.
+
+Default is true.
+
+##### `IgnoreDefaultInitialization`
+
+If set to non-zero, the check does not suggest edits that will transform default initialization into value initialization, as this can cause performance regressions.
+
+Default is 1.
+
+### modernize-pass-by-value
+
+With move semantics added to the language and the standard library updated with move constructors added for many types it is now interesting to take an argument directly by value, instead of by const-reference, and then copy. This check allows the compiler to take care of choosing the best way to construct the copy.
+
+The transformation is usually beneficial when the calling code passes an *rvalue* and assumes the move construction is a cheap operation. This short example illustrates how the construction of the value happens:
+
+```
+void foo(std::string s);
+std::string get_str();
+
+void f(const std::string &str) {
+  foo(str);       // lvalue  -> copy construction
+  foo(get_str()); // prvalue -> move construction
+}
+```
+
+**Note**
+
+Currently, only constructors are transformed to make use of pass-by-value. Contributions that handle other situations are welcome!
+
+#### Pass-by-value in constructors
+
+Replaces the uses of const-references constructor parameters that are copied into class fields. The parameter is then moved with std::move().
+
+Since `std::move()` is a library function declared in <utility> it may be necessary to add this include. The check will add the include directive when necessary.
+
+```
+ #include <string>
+
+ class Foo {
+ public:
+-  Foo(const std::string &Copied, const std::string &ReadOnly)
+-    : Copied(Copied), ReadOnly(ReadOnly)
++  Foo(std::string Copied, const std::string &ReadOnly)
++    : Copied(std::move(Copied)), ReadOnly(ReadOnly)
+   {}
+
+ private:
+   std::string Copied;
+   const std::string &ReadOnly;
+ };
+
+ std::string get_cwd();
+
+ void f(const std::string &Path) {
+   // The parameter corresponding to 'get_cwd()' is move-constructed. By
+   // using pass-by-value in the Foo constructor we managed to avoid a
+   // copy-construction.
+   Foo foo(get_cwd(), Path);
+ }
+```
+
+If the parameter is used more than once no transformation is performed since moved objects have an undefined state. It means the following code will be left untouched:
+
+```
+#include <string>
+
+void pass(const std::string &S);
+
+struct Foo {
+  Foo(const std::string &S) : Str(S) {
+    pass(S);
+  }
+
+  std::string Str;
+};
+```
+
+##### Known limitations
+
+A situation where the generated code can be wrong is when the object referenced is modified before the assignment in the init-list through a “hidden” reference.
+
+Example:
+
+```
+ std::string s("foo");
+
+ struct Base {
+   Base() {
+     s = "bar";
+   }
+ };
+
+ struct Derived : Base {
+-  Derived(const std::string &S) : Field(S)
++  Derived(std::string S) : Field(std::move(S))
+   { }
+
+   std::string Field;
+ };
+
+ void f() {
+-  Derived d(s); // d.Field holds "bar"
++  Derived d(s); // d.Field holds "foo"
+ }
+```
+
+##### Note about delayed template parsing
+
+When delayed template parsing is enabled, constructors part of templated contexts; templated constructors, constructors in class templates, constructors of inner classes of template classes, etc., are not transformed. Delayed template parsing is enabled by default on Windows as a Microsoft extension: [Clang Compiler User’s Manual - Microsoft extensions](https://clang.llvm.org/docs/UsersManual.html#microsoft-extensions).
+
+Delayed template parsing can be enabled using the -fdelayed-template-parsing flag and disabled using -fno-delayed-template-parsing.
+
+Example:
+
+```
+  template <typename T> class C {
+    std::string S;
+
+  public:
+=  // using -fdelayed-template-parsing (default on Windows)
+=  C(const std::string &S) : S(S) {}
+
++  // using -fno-delayed-template-parsing (default on non-Windows systems)
++  C(std::string S) : S(std::move(S)) {}
+  };
+```
+
+**See also**
+
+For more information about the pass-by-value idiom, read: [Want Speed? Pass by Value](https://web.archive.org/web/20140205194657/http://cpp-next.com/archive/2009/08/want-speed-pass-by-value/).
+
+#### Options
+
+##### `IncludeStyle`
+
+A string specifying which include-style is used, llvm or google.
+
+Default is llvm.
+
+##### `ValuesOnly`
+
+When true, the check only warns about copied parameters that are already passed by value.
+
+Default is false.
+
+### modernize-raw-string-literal
+
+This check selectively replaces string literals containing escaped characters with raw string literals.
+
+Example:
+
+```
+const char *const Quotes{"embedded \"quotes\""};
+const char *const Paragraph{"Line one.\nLine two.\nLine three.\n"};
+const char *const SingleLine{"Single line.\n"};
+const char *const TrailingSpace{"Look here -> \n"};
+const char *const Tab{"One\tTwo\n"};
+const char *const Bell{"Hello!\a  And welcome!"};
+const char *const Path{"C:\\Program Files\\Vendor\\Application.exe"};
+const char *const RegEx{"\\w\\([a-z]\\)"};
+```
+
+becomes
+
+```
+const char *const Quotes{R"(embedded "quotes")"};
+const char *const Paragraph{"Line one.\nLine two.\nLine three.\n"};
+const char *const SingleLine{"Single line.\n"};
+const char *const TrailingSpace{"Look here -> \n"};
+const char *const Tab{"One\tTwo\n"};
+const char *const Bell{"Hello!\a  And welcome!"};
+const char *const Path{R"(C:\Program Files\Vendor\Application.exe)"};
+const char *const RegEx{R"(\w\([a-z]\))"};
+```
+
+The presence of any of the following escapes can cause the string to be converted to a raw string literal: `\\`, `\'`, `\"`, `\?`, and octal or hexadecimal escapes for printable ASCII characters.
+
+A string literal containing only escaped newlines is a common way of writing lines of text output. Introducing physical newlines with raw string literals in this case is likely to impede readability. These string literals are left unchanged.
+
+An escaped horizontal tab, form feed, or vertical tab prevents the string literal from being converted. The presence of a horizontal tab, form feed or vertical tab in source code is not visually obvious.
+
+#### Options
+
+##### `DelimiterStem`
+
+Custom delimiter to escape characters in raw string literals.
+
+It is used in the following construction: `R"stem_delimiter(contents)stem_delimiter"`.
+
+The default value is lit.
+
+##### `ReplaceShorterLiterals`
+
+Controls replacing shorter non-raw string literals with longer raw string literals.
+
+Setting this option to true enables the replacement.
+
+The default value is false (shorter literals are not replaced).
+
+### modernize-redundant-void-arg
+
+Find and remove redundant `void` argument lists.
+
+Examples
+
+| Initial code                      | Code with applied fixes   |
+| --------------------------------- | ------------------------- |
+| `int f(void);`                    | `int f();`                |
+| `int (*f(void))(void);`           | `int (*f())();`           |
+| `typedef int (*f_t(void))(void);` | `typedef int (*f_t())();` |
+| `void (C::*p)(void);`             | `void (C::*p)();`         |
+| `C::C(void) {}`                   | `C::C() {}`               |
+| `C::~C(void) {}`                  | `C::~C() {}`              |
+
+### modernize-replace-auto-ptr
+
+This check replaces the uses of the deprecated class `std::auto_ptr` by `std::unique_ptr` (introduced in C++11). The transfer of ownership, done by the copy-constructor and the assignment operator, is changed to match `std::unique_ptr` usage by using explicit calls to `std::move()`.
+
+Migration example:
+
+```
+-void take_ownership_fn(std::auto_ptr<int> int_ptr);
++void take_ownership_fn(std::unique_ptr<int> int_ptr);
+
+ void f(int x) {
+-  std::auto_ptr<int> a(new int(x));
+-  std::auto_ptr<int> b;
++  std::unique_ptr<int> a(new int(x));
++  std::unique_ptr<int> b;
+
+-  b = a;
+-  take_ownership_fn(b);
++  b = std::move(a);
++  take_ownership_fn(std::move(b));
+ }
+```
+
+Since `std::move()` is a library function declared in `<utility>` it may be necessary to add this include. The check will add the include directive when necessary.
+
+#### Known Limitations
+
+- If headers modification is not activated or if a header is not allowed to be changed this check will produce broken code (compilation error), where the headers’ code will stay unchanged while the code using them will be changed.
+- Client code that declares a reference to an `std::auto_ptr` coming from code that can’t be migrated (such as a header coming from a 3rd party library) will produce a compilation error after migration. This is because the type of the reference will be changed to `std::unique_ptr` but the type returned by the library won’t change, binding a reference to `std::unique_ptr` from an `std::auto_ptr`. This pattern doesn’t make much sense and usually `std::auto_ptr` are stored by value (otherwise what is the point in using them instead of a reference or a pointer?).
+
+```
+ // <3rd-party header...>
+ std::auto_ptr<int> get_value();
+ const std::auto_ptr<int> & get_ref();
+
+ // <calling code (with migration)...>
+-std::auto_ptr<int> a(get_value());
++std::unique_ptr<int> a(get_value()); // ok, unique_ptr constructed from auto_ptr
+
+-const std::auto_ptr<int> & p = get_ptr();
++const std::unique_ptr<int> & p = get_ptr(); // won't compile
+```
+
+- Non-instantiated templates aren’t modified.
+
+```
+template <typename X>
+void f() {
+    std::auto_ptr<X> p;
+}
+
+// only 'f<int>()' (or similar) will trigger the replacement.
+```
+
+#### Options
+
+##### `IncludeStyle`
+
+A string specifying which include-style is used, llvm or google.
+
+Default is llvm.
+
+### modernize-replace-disallow-copy-and-assign-macro
+
+Finds macro expansions of `DISALLOW_COPY_AND_ASSIGN(Type)` and replaces them with a deleted copy constructor and a deleted assignment operator.
+
+Before the `delete` keyword was introduced in C++11 it was common practice to declare a copy constructor and an assignment operator as private members. This effectively makes them unusable to the public API of a class.
+
+With the advent of the `delete` keyword in C++11 we can abandon the `private` access of the copy constructor and the assignment operator and delete the methods entirely.
+
+When running this check on a code like this:
+
+```
+class Foo {
+private:
+  DISALLOW_COPY_AND_ASSIGN(Foo);
+};
+```
+
+It will be transformed to this:
+
+```
+class Foo {
+private:
+  Foo(const Foo &) = delete;
+  const Foo &operator=(const Foo &) = delete;
+};
+```
+
+#### Known Limitations
+
+Notice that the migration example above leaves the `private` access specification untouched. You might want to run the check [modernize-use-equals-delete](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-equals-delete.html) to get warnings for deleted functions in private sections.
+
+#### Options
+
+##### `MacroName`
+
+A string specifying the macro name whose expansion will be replaced.
+
+Default is `DISALLOW_COPY_AND_ASSIGN`.
+
+See: https://en.cppreference.com/w/cpp/language/function#Deleted_functions
+
+### modernize-replace-random-shuffle
+
+This check will find occurrences of `std::random_shuffle` and replace it with `std::shuffle`. In C++17 `std::random_shuffle` will no longer be available and thus we need to replace it.
+
+Below are two examples of what kind of occurrences will be found and two examples of what it will be replaced with.
+
+```
+std::vector<int> v;
+
+// First example
+std::random_shuffle(vec.begin(), vec.end());
+
+// Second example
+std::random_shuffle(vec.begin(), vec.end(), randomFunc);
+```
+
+Both of these examples will be replaced with:
+
+```
+std::shuffle(vec.begin(), vec.end(), std::mt19937(std::random_device()()));
+```
+
+The second example will also receive a warning that `randomFunc` is no longer supported in the same way as before so if the user wants the same functionality, the user will need to change the implementation of the `randomFunc`.
+
+One thing to be aware of here is that `std::random_device` is quite expensive to initialize. So if you are using the code in a performance critical place, you probably want to initialize it elsewhere. Another thing is that the seeding quality of the suggested fix is quite poor: `std::mt19937` has an internal state of 624 32-bit integers, but is only seeded with a single integer. So if you require higher quality randomness, you should consider seeding better, for example:
+
+```
+std::shuffle(v.begin(), v.end(), []() {
+  std::mt19937::result_type seeds[std::mt19937::state_size];
+  std::random_device device;
+  std::uniform_int_distribution<typename std::mt19937::result_type> dist;
+  std::generate(std::begin(seeds), std::end(seeds), [&] { return dist(device); });
+  std::seed_seq seq(std::begin(seeds), std::end(seeds));
+  return std::mt19937(seq);
+}());
+```
+
 ### modernize-return-braced-init-list
 
 Replaces explicit calls to the constructor in a return with a braced initializer list. This way the return type is not needlessly duplicated in the function definition and the return statement.
@@ -2574,6 +5726,522 @@ Foo bar() {
 }
 ```
 
+### modernize-shrink-to-fit
+
+Replace copy and swap tricks on shrinkable containers with the `shrink_to_fit()` method call.
+
+The `shrink_to_fit()` method is more readable and more effective than the copy and swap trick to reduce the capacity of a shrinkable container. Note that, the `shrink_to_fit()` method is only available in C++11 and up.
+
+### modernize-type-traits
+
+Converts standard library type traits of the form `traits<...>::type` and `traits<...>::value` into `traits_t<...>` and `traits_v<...>` respectively.
+
+For example:
+
+```
+std::is_integral<T>::value
+std::is_same<int, float>::value
+typename std::add_const<T>::type
+std::make_signed<unsigned>::type
+```
+
+Would be converted into:
+
+```
+std::is_integral_v<T>
+std::is_same_v<int, float>
+std::add_const_t<T>
+std::make_signed_t<unsigned>
+```
+
+#### Options
+
+##### `IgnoreMacros`
+
+If true don’t diagnose traits defined in macros.
+
+Note: Fixes will never be emitted for code inside of macros.`#define IS_SIGNED(T) std::is_signed<T>::value `.
+
+Defaults to false.
+
+### modernize-unary-static-assert
+
+The check diagnoses any `static_assert` declaration with an empty string literal and provides a fix-it to replace the declaration with a single-argument `static_assert` declaration.
+
+The check is only applicable for C++17 and later code.
+
+The following code:
+
+```
+void f_textless(int a) {
+  static_assert(sizeof(a) <= 10, "");
+}
+```
+
+is replaced by:
+
+```
+void f_textless(int a) {
+  static_assert(sizeof(a) <= 10);
+}
+```
+
+### modernize-use-auto
+
+This check is responsible for using the `auto` type specifier for variable declarations to *improve code readability and maintainability*. For example:
+
+```
+std::vector<int>::iterator I = my_container.begin();
+
+// transforms to:
+
+auto I = my_container.begin();
+```
+
+The `auto` type specifier will only be introduced in situations where the variable type matches the type of the initializer expression. In other words `auto` should deduce the same type that was originally spelled in the source. However, not every situation should be transformed:
+
+```
+int val = 42;
+InfoStruct &I = SomeObject.getInfo();
+
+// Should not become:
+
+auto val = 42;
+auto &I = SomeObject.getInfo();
+```
+
+In this example using `auto` for builtins doesn’t improve readability. In other situations it makes the code less self-documenting impairing readability and maintainability. As a result, `auto` is used only introduced in specific situations described below.
+
+#### Iterators
+
+Iterator type specifiers tend to be long and used frequently, especially in loop constructs. Since the functions generating iterators have a common format, the type specifier can be replaced without obscuring the meaning of code while improving readability and maintainability.
+
+```
+for (std::vector<int>::iterator I = my_container.begin(),
+                                E = my_container.end();
+     I != E; ++I) {
+}
+
+// becomes
+
+for (auto I = my_container.begin(), E = my_container.end(); I != E; ++I) {
+}
+```
+
+The check will only replace iterator type-specifiers when all of the following conditions are satisfied:
+
+- The iterator is for one of the standard containers in `std` namespace:
+  - `array`
+  - `deque`
+  - `forward_list`
+  - `list`
+  - `vector`
+  - `map`
+  - `multimap`
+  - `set`
+  - `multiset`
+  - `unordered_map`
+  - `unordered_multimap`
+  - `unordered_set`
+  - `unordered_multiset`
+  - `queue`
+  - `priority_queue`
+  - `stack`
+- The iterator is one of the possible iterator types for standard containers:
+  - `iterator`
+  - `reverse_iterator`
+  - `const_iterator`
+  - `const_reverse_iterator`
+- In addition to using iterator types directly, typedefs or other ways of referring to those types are also allowed. However, implementation-specific types for which a type like `std::vector<int>::iterator` is itself a typedef will not be transformed. Consider the following examples:
+
+```
+// The following direct uses of iterator types will be transformed.
+std::vector<int>::iterator I = MyVec.begin();
+{
+  using namespace std;
+  list<int>::iterator I = MyList.begin();
+}
+
+// The type specifier for J would transform to auto since it's a typedef
+// to a standard iterator type.
+typedef std::map<int, std::string>::const_iterator map_iterator;
+map_iterator J = MyMap.begin();
+
+// The following implementation-specific iterator type for which
+// std::vector<int>::iterator could be a typedef would not be transformed.
+__gnu_cxx::__normal_iterator<int*, std::vector> K = MyVec.begin();
+```
+
+- The initializer for the variable being declared is not a braced initializer list. Otherwise, use of `auto` would cause the type of the variable to be deduced as `std::initializer_list`.
+
+#### New expressions
+
+Frequently, when a pointer is declared and initialized with `new`, the pointee type is written twice: in the declaration type and in the `new` expression. In this case, the declaration type can be replaced with `auto` improving readability and maintainability.
+
+```
+TypeName *my_pointer = new TypeName(my_param);
+
+// becomes
+
+auto *my_pointer = new TypeName(my_param);
+```
+
+The check will also replace the declaration type in multiple declarations, if the following conditions are satisfied:
+
+- All declared variables have the same type (i.e. all of them are pointers to the same type).
+- All declared variables are initialized with a `new` expression.
+- The types of all the new expressions are the same than the pointee of the declaration type.
+
+```
+TypeName *my_first_pointer = new TypeName, *my_second_pointer = new TypeName;
+
+// becomes
+
+auto *my_first_pointer = new TypeName, *my_second_pointer = new TypeName;
+```
+
+#### Cast expressions
+
+Frequently, when a variable is declared and initialized with a cast, the variable type is written twice: in the declaration type and in the cast expression. In this case, the declaration type can be replaced with `auto` improving readability and maintainability.
+
+```
+TypeName *my_pointer = static_cast<TypeName>(my_param);
+
+// becomes
+
+auto *my_pointer = static_cast<TypeName>(my_param);
+```
+
+The check handles `static_cast`, `dynamic_cast`, `const_cast`, `reinterpret_cast`, functional casts, C-style casts and function templates that behave as casts, such as `llvm::dyn_cast`, `boost::lexical_cast` and `gsl::narrow_cast`. Calls to function templates are considered to behave as casts if the first template argument is explicit and is a type, and the function returns that type, or a pointer or reference to it.
+
+#### Known Limitations
+
+- If the initializer is an explicit conversion constructor, the check will not replace the type specifier even though it would be safe to do so.
+- User-defined iterators are not handled at this time.
+
+#### Options
+
+##### `MinTypeNameLength`
+
+If the option is set to non-zero (default 5), the check will ignore type names having a length less than the option value. The option affects expressions only, not iterators. Spaces between multi-lexeme type names (`long int`) are considered as one. If the [`RemoveStars`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-auto.html#cmdoption-arg-RemoveStars) option (see below) is set to true, then `*s` in the type are also counted as a part of the type name.
+
+```
+// MinTypeNameLength = 0, RemoveStars=0
+
+int a = static_cast<int>(foo());            // ---> auto a = ...
+// length(bool *) = 4
+bool *b = new bool;                         // ---> auto *b = ...
+unsigned c = static_cast<unsigned>(foo());  // ---> auto c = ...
+
+// MinTypeNameLength = 5, RemoveStars=0
+
+int a = static_cast<int>(foo());                 // ---> int  a = ...
+bool b = static_cast<bool>(foo());               // ---> bool b = ...
+bool *pb = static_cast<bool*>(foo());            // ---> bool *pb = ...
+unsigned c = static_cast<unsigned>(foo());       // ---> auto c = ...
+// length(long <on-or-more-spaces> int) = 8
+long int d = static_cast<long int>(foo());       // ---> auto d = ...
+
+// MinTypeNameLength = 5, RemoveStars=1
+
+int a = static_cast<int>(foo());                 // ---> int  a = ...
+// length(int * * ) = 5
+int **pa = static_cast<int**>(foo());            // ---> auto pa = ...
+bool b = static_cast<bool>(foo());               // ---> bool b = ...
+bool *pb = static_cast<bool*>(foo());            // ---> auto pb = ...
+unsigned c = static_cast<unsigned>(foo());       // ---> auto c = ...
+long int d = static_cast<long int>(foo());       // ---> auto d = ...
+```
+
+##### `RemoveStars`
+
+If the option is set to true (default is false), the check will remove stars from the non-typedef pointer types when replacing type names with `auto`. Otherwise, the check will leave stars.
+
+For example:
+
+```
+TypeName *my_first_pointer = new TypeName, *my_second_pointer = new TypeName;
+
+// RemoveStars = 0
+
+auto *my_first_pointer = new TypeName, *my_second_pointer = new TypeName;
+
+// RemoveStars = 1
+
+auto my_first_pointer = new TypeName, my_second_pointer = new TypeName;
+```
+
+### modernize-use-bool-literals
+
+Finds integer literals which are cast to `bool`.
+
+```
+bool p = 1;
+bool f = static_cast<bool>(1);
+std::ios_base::sync_with_stdio(0);
+bool x = p ? 1 : 0;
+
+// transforms to
+
+bool p = true;
+bool f = true;
+std::ios_base::sync_with_stdio(false);
+bool x = p ? true : false;
+```
+
+#### Options
+
+##### `IgnoreMacros`
+
+If set to true, the check will not give warnings inside macros.
+
+Default is true.
+
+### modernize-use-constraints
+
+Replace `std::enable_if` with C++20 requires clauses.
+
+`std::enable_if` is a SFINAE mechanism for selecting the desired function or class template based on type traits or other requirements. `enable_if` changes the meta-arity of the template, and has other [adverse side effects](https://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0225r0.html) in the code. C++20 introduces concepts and constraints as a cleaner language provided solution to achieve the same outcome.
+
+This check finds some common `std::enable_if` patterns that can be replaced by C++20 requires clauses. The tool can replace some of these patterns automatically, otherwise, the tool will emit a diagnostic without a replacement. The tool can detect the following `std::enable_if` patterns
+
+1. `std::enable_if` in the return type of a function
+2. `std::enable_if` as the trailing template parameter for function templates
+
+Other uses, for example, in class templates for function parameters, are not currently supported by this tool. Other variants such as `boost::enable_if` are not currently supported by this tool.
+
+Below are some examples of code using `std::enable_if`.
+
+```
+// enable_if in function return type
+template <typename T>
+std::enable_if_t<T::some_trait, int> only_if_t_has_the_trait() { ... }
+
+// enable_if in the trailing template parameter
+template <typename T, std::enable_if_t<T::some_trait, int> = 0>
+void another_version() { ... }
+
+template <typename T>
+typename std::enable_if<T::some_value, Obj>::type existing_constraint() requires (T::another_value) {
+  return Obj{};
+}
+
+template <typename T, std::enable_if_t<T::some_trait, int> = 0>
+struct my_class {};
+```
+
+The tool will replace the above code with,
+
+```
+// warning: use C++20 requires constraints instead of enable_if [modernize-use-constraints]
+template <typename T>
+int only_if_t_has_the_trait() requires T::some_trait { ... }
+
+// warning: use C++20 requires constraints instead of enable_if [modernize-use-constraints]
+template <typename T>
+void another_version() requires T::some_trait { ... }
+
+// The tool will emit a diagnostic for the following, but will
+// not attempt to replace the code.
+// warning: use C++20 requires constraints instead of enable_if [modernize-use-constraints]
+template <typename T>
+typename std::enable_if<T::some_value, Obj>::type existing_constraint() requires (T::another_value) {
+  return Obj{};
+}
+
+// The tool will not emit a diagnostic or attempt to replace the code.
+template <typename T, std::enable_if_t<T::some_trait, int> = 0>
+struct my_class {};
+```
+
+### modernize-use-default-member-init
+
+This check converts constructors’ member initializers into the new default member initializers in C++11. Other member initializers that match the default member initializer are removed. This can reduce repeated code or allow use of ‘= default’.
+
+```
+struct A {
+  A() : i(5), j(10.0) {}
+  A(int i) : i(i), j(10.0) {}
+  int i;
+  double j;
+};
+
+// becomes
+
+struct A {
+  A() {}
+  A(int i) : i(i) {}
+  int i{5};
+  double j{10.0};
+};
+```
+
+Note
+
+Only converts member initializers for built-in types, enums, and pointers. The readability-redundant-member-init check will remove redundant member initializers for classes.
+
+#### Options
+
+##### `UseAssignment`
+
+If this option is set to true (default is false), the check will initialize members with an assignment.
+
+For example:
+
+```
+struct A {
+  A() {}
+  A(int i) : i(i) {}
+  int i = 5;
+  double j = 10.0;
+};
+```
+
+##### `IgnoreMacros`
+
+If this option is set to true (default is true), the check will not warn about members declared inside macros.
+
+### modernize-use-emplace
+
+The check flags insertions to an STL-style container done by calling the `push_back`, `push`, or `push_front` methods with an explicitly-constructed temporary of the container element type. In this case, the corresponding `emplace` equivalent methods result in less verbose and potentially more efficient code. Right now the check doesn’t support `insert`. It also doesn’t support `insert` functions for associative containers because replacing `insert` with `emplace` may result in [speed regression](https://htmlpreview.github.io/?https://github.com/HowardHinnant/papers/blob/master/insert_vs_emplace.html), but it might get support with some addition flag in the future.
+
+The [`ContainersWithPushBack`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-ContainersWithPushBack), [`ContainersWithPush`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-ContainersWithPush), and [`ContainersWithPushFront`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-ContainersWithPushFront) options are used to specify the container types that support the `push_back`, `push`, and `push_front` operations respectively. The default values for these options are as follows:
+
+- [`ContainersWithPushBack`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-ContainersWithPushBack): `std::vector`, `std::deque`, and `std::list`.
+- [`ContainersWithPush`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-ContainersWithPush): `std::stack`, `std::queue`, and `std::priority_queue`.
+- [`ContainersWithPushFront`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-ContainersWithPushFront): `std::forward_list`, `std::list`, and `std::deque`.
+
+This check also reports when an `emplace`-like method is improperly used, for example using `emplace_back` while also calling a constructor. This creates a temporary that requires at best a move and at worst a copy. Almost all `emplace`-like functions in the STL are covered by this, with `try_emplace` on `std::map` and `std::unordered_map` being the exception as it behaves slightly differently than all the others. More containers can be added with the [`EmplacyFunctions`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-EmplacyFunctions) option, so long as the container defines a `value_type` type, and the `emplace`-like functions construct a `value_type` object.
+
+Before:
+
+```
+std::vector<MyClass> v;
+v.push_back(MyClass(21, 37));
+v.emplace_back(MyClass(21, 37));
+
+std::vector<std::pair<int, int>> w;
+
+w.push_back(std::pair<int, int>(21, 37));
+w.push_back(std::make_pair(21L, 37L));
+w.emplace_back(std::make_pair(21L, 37L));
+```
+
+After:
+
+```
+std::vector<MyClass> v;
+v.emplace_back(21, 37);
+v.emplace_back(21, 37);
+
+std::vector<std::pair<int, int>> w;
+w.emplace_back(21, 37);
+w.emplace_back(21L, 37L);
+w.emplace_back(21L, 37L);
+```
+
+By default, the check is able to remove unnecessary `std::make_pair` and `std::make_tuple` calls from `push_back` calls on containers of `std::pair` and `std::tuple`. Custom tuple-like types can be modified by the [`TupleTypes`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-TupleTypes) option; custom make functions can be modified by the [`TupleMakeFunctions`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-TupleMakeFunctions) option.
+
+The other situation is when we pass arguments that will be converted to a type inside a container.
+
+Before:
+
+```
+std::vector<boost::optional<std::string> > v;
+v.push_back("abc");
+```
+
+After:
+
+```
+std::vector<boost::optional<std::string> > v;
+v.emplace_back("abc");
+```
+
+In some cases the transformation would be valid, but the code wouldn’t be exception safe. In this case the calls of `push_back` won’t be replaced.
+
+```
+std::vector<std::unique_ptr<int>> v;
+v.push_back(std::unique_ptr<int>(new int(0)));
+auto *ptr = new int(1);
+v.push_back(std::unique_ptr<int>(ptr));
+```
+
+This is because replacing it with `emplace_back` could cause a leak of this pointer if `emplace_back` would throw exception before emplacement (e.g. not enough memory to add a new element).
+
+For more info read item 42 - “Consider emplacement instead of insertion.” of Scott Meyers “Effective Modern C++”.
+
+The default smart pointers that are considered are `std::unique_ptr`, `std::shared_ptr`, `std::auto_ptr`. To specify other smart pointers or other classes use the [`SmartPointers`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-SmartPointers) option.
+
+Check also doesn’t fire if any argument of the constructor call would be:
+
+- a bit-field (bit-fields can’t bind to rvalue/universal reference)
+- a `new` expression (to avoid leak)
+- if the argument would be converted via derived-to-base cast.
+
+This check requires C++11 or higher to run.
+
+#### Options
+
+##### `ContainersWithPushBack`
+
+Semicolon-separated list of class names of custom containers that support `push_back`.
+
+##### `ContainersWithPush`
+
+Semicolon-separated list of class names of custom containers that support `push`.
+
+##### `ContainersWithPushFront`
+
+Semicolon-separated list of class names of custom containers that support `push_front`.
+
+##### `IgnoreImplicitConstructors`
+
+When true, the check will ignore implicitly constructed arguments of `push_back`, e.g.
+
+```c++
+std::vector<std::string> v;
+v.push_back("a"); // Ignored when IgnoreImplicitConstructors is `true`.
+```
+
+Default is false.
+
+##### `SmartPointers`
+
+Semicolon-separated list of class names of custom smart pointers.
+
+##### `TupleTypes`
+
+Semicolon-separated list of `std::tuple`-like class names.
+
+##### `TupleMakeFunctions`
+
+Semicolon-separated list of `std::make_tuple`-like function names.
+
+Those function calls will be removed from `push_back` calls and turned into `emplace_back`.
+
+##### `EmplacyFunctions`
+
+Semicolon-separated list of containers without their template parameters and some `emplace`-like method of the container. Example: `vector::emplace_back`. Those methods will be checked for improper use and the check will report when a temporary is unnecessarily created.
+
+#### Example
+
+```
+std::vector<MyTuple<int, bool, char>> x;
+x.push_back(MakeMyTuple(1, false, 'x'));
+x.emplace_back(MakeMyTuple(1, false, 'x'));
+```
+
+transforms to:
+
+```
+std::vector<MyTuple<int, bool, char>> x;
+x.emplace_back(1, false, 'x');
+x.emplace_back(1, false, 'x');
+```
+
+when [`TupleTypes`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-TupleTypes) is set to `MyTuple`, [`TupleMakeFunctions`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-TupleMakeFunctions) is set to `MakeMyTuple`, and [`EmplacyFunctions`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-emplace.html#cmdoption-arg-EmplacyFunctions) is set to `vector::emplace_back`.
+
 ### modernize-use-equals-default
 
 This check replaces default bodies of special member functions with `= default;`. The explicitly defaulted function declarations enable more opportunities in optimization, because the compiler might treat explicitly defaulted functions as trivial.
@@ -2590,6 +6258,363 @@ Note: Move-constructor and move-assignment operator are not supported yet.
   - If set to `true`, the check will not give warnings inside macros and will ignore special members with bodies contain macros or preprocessor directives.
     - 如果设置为`true`，检查将不会在宏中给出警告，并且会忽略主体中包含宏或预处理器指令的特殊成员。
   - Default is `true`.
+
+### modernize-use-equals-delete
+
+Identifies unimplemented private special member functions, and recommends using `= delete` for them. Additionally, it recommends relocating any deleted member function from the `private` to the `public` section.
+
+Before the introduction of C++11, the primary method to effectively “erase” a particular function involved declaring it as `private` without providing a definition. This approach would result in either a compiler error (when attempting to call a private function) or a linker error (due to an undefined reference).
+
+However, subsequent to the advent of C++11, a more conventional approach emerged for achieving this purpose. It involves flagging functions as `= delete` and keeping them in the `public` section of the class.
+
+To prevent false positives, this check is only active within a translation unit where all other member functions have been implemented. The check will generate partial fixes by introducing `= delete`, but the user is responsible for manually relocating functions to the `public` section.
+
+```
+// Example: bad
+class A {
+ private:
+  A(const A&);
+  A& operator=(const A&);
+};
+
+// Example: good
+class A {
+ public:
+  A(const A&) = delete;
+  A& operator=(const A&) = delete;
+};
+```
+
+#### Options
+
+##### `IgnoreMacros`
+
+If this option is set to true (default is true), the check will not warn about functions declared inside macros.
+
+### modernize-use-nodiscard
+
+Adds `[[nodiscard]]` attributes (introduced in C++17) to member functions in order to highlight at compile time which return values should not be ignored.
+
+Member functions need to satisfy the following conditions to be considered by this check:
+
+- no `[[nodiscard]]`, `[[noreturn]]`, `__attribute__((warn_unused_result))`, `[[clang::warn_unused_result]]` nor `[[gcc::warn_unused_result]]` attribute,
+- non-void return type,
+- non-template return types,
+- const member function,
+- non-variadic functions,
+- no non-const reference parameters,
+- no pointer parameters,
+- no template parameters,
+- no template function parameters,
+- not be a member of a class with mutable member variables,
+- no Lambdas,
+- no conversion functions.
+
+Such functions have no means of altering any state or passing values other than via the return type. Unless the member functions are altering state via some external call (e.g. I/O).
+
+#### Example
+
+```
+bool empty() const;
+bool empty(int i) const;
+```
+
+transforms to:
+
+```
+[[nodiscard]] bool empty() const;
+[[nodiscard]] bool empty(int i) const;
+```
+
+#### Options
+
+##### `ReplacementString`
+
+Specifies a macro to use instead of `[[nodiscard]]`.
+
+This is useful when maintaining source code that needs to compile with a pre-C++17 compiler.
+
+#### Example
+
+```
+bool empty() const;
+bool empty(int i) const;
+```
+
+transforms to:
+
+```
+NO_DISCARD bool empty() const;
+NO_DISCARD bool empty(int i) const;
+```
+
+if the [`ReplacementString`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-nodiscard.html#cmdoption-arg-ReplacementString) option is set to NO_DISCARD.
+
+**Note**
+
+If the [`ReplacementString`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-nodiscard.html#cmdoption-arg-ReplacementString) is not a C++ attribute, but instead a macro, then that macro must be defined in scope or the fix-it will not be applied.
+
+Note
+
+For alternative `__attribute__` syntax options to mark functions as `[[nodiscard]]` in non-c++17 source code. See https://clang.llvm.org/docs/AttributeReference.html#nodiscard-warn-unused-result
+
+### modernize-use-noexcept
+
+This check replaces deprecated dynamic exception specifications with the appropriate noexcept specification (introduced in C++11). By default this check will replace `throw()` with `noexcept`, and `throw(<exception>[,...])` or `throw(...)` with `noexcept(false)`.
+
+#### Example
+
+```
+void foo() throw();
+void bar() throw(int) {}
+```
+
+transforms to:
+
+```
+void foo() noexcept;
+void bar() noexcept(false) {}
+```
+
+#### Options
+
+##### `ReplacementString`
+
+Users can use [`ReplacementString`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-nodiscard.html#cmdoption-arg-ReplacementString) to specify a macro to use instead of `noexcept`. This is useful when maintaining source code that uses custom exception specification marking other than `noexcept`. Fix-it hints will only be generated for non-throwing specifications.
+
+##### Example
+
+```
+void bar() throw(int);
+void foo() throw();
+```
+
+transforms to:
+
+```
+void bar() throw(int);  // No fix-it generated.
+void foo() NOEXCEPT;
+```
+
+if the [`ReplacementString`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-nodiscard.html#cmdoption-arg-ReplacementString) option is set to NOEXCEPT.
+
+##### `UseNoexceptFalse`
+
+Enabled by default, disabling will generate fix-it hints that remove throwing dynamic exception specs, e.g., `throw(<something>)`, completely without providing a replacement text, except for destructors and delete operators that are `noexcept(true)` by default.
+
+##### Example
+
+```
+void foo() throw(int) {}
+
+struct bar {
+  void foobar() throw(int);
+  void operator delete(void *ptr) throw(int);
+  void operator delete[](void *ptr) throw(int);
+  ~bar() throw(int);
+}
+```
+
+transforms to:
+
+```
+void foo() {}
+
+struct bar {
+  void foobar();
+  void operator delete(void *ptr) noexcept(false);
+  void operator delete[](void *ptr) noexcept(false);
+  ~bar() noexcept(false);
+}
+```
+
+if the [`UseNoexceptFalse`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-noexcept.html#cmdoption-arg-UseNoexceptFalse) option is set to false.
+
+### modernize-use-nullptr
+
+The check converts the usage of null pointer constants (e.g. `NULL`, `0`) to use the new C++11 `nullptr` keyword.
+
+#### Example
+
+```
+void assignment() {
+  char *a = NULL;
+  char *b = 0;
+  char c = 0;
+}
+
+int *ret_ptr() {
+  return 0;
+}
+```
+
+transforms to:
+
+```
+void assignment() {
+  char *a = nullptr;
+  char *b = nullptr;
+  char c = 0;
+}
+
+int *ret_ptr() {
+  return nullptr;
+}
+```
+
+#### Options
+
+##### `IgnoredTypes`
+
+Semicolon-separated list of regular expressions to match pointer types for which implicit casts will be ignored. Default value: std::_CmpUnspecifiedParam::;^std::__cmp_cat::__unspec.
+
+##### `NullMacros`
+
+Comma-separated list of macro names that will be transformed along with `NULL`. By default this check will only replace the `NULL` macro and will skip any similar user-defined macros.
+
+#### Example
+
+```
+#define MY_NULL (void*)0
+void assignment() {
+  void *p = MY_NULL;
+}
+```
+
+transforms to:
+
+```
+#define MY_NULL NULL
+void assignment() {
+  int *p = nullptr;
+}
+```
+
+if the [`NullMacros`](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-nullptr.html#cmdoption-arg-NullMacros) option is set to `MY_NULL`.
+
+### modernize-use-override
+
+Adds `override` (introduced in C++11) to overridden virtual functions and removes `virtual` from those functions as it is not required.
+
+`virtual` on non base class implementations was used to help indicate to the user that a function was virtual. C++ compilers did not use the presence of this to signify an overridden function.
+
+In C++ 11 `override` and `final` keywords were introduced to allow overridden functions to be marked appropriately. Their presence allows compilers to verify that an overridden function correctly overrides a base class implementation.
+
+This can be useful as compilers can generate a compile time error when:
+
+> - The base class implementation function signature changes.
+> - The user has not created the override with the correct signature.
+
+#### Options
+
+##### `IgnoreDestructors`
+
+If set to true, this check will not diagnose destructors.
+
+Default is false.
+
+##### `IgnoreTemplateInstantiations`
+
+If set to true, instructs this check to ignore virtual function overrides that are part of template instantiations.
+
+Default is false.
+
+##### `AllowOverrideAndFinal`
+
+If set to true, this check will not diagnose `override` as redundant with `final`. This is useful when code will be compiled by a compiler with warning/error checking flags requiring `override` explicitly on overridden members, such as `gcc -Wsuggest-override`/`gcc -Werror=suggest-override`.
+
+Default is false.
+
+##### `OverrideSpelling`
+
+Specifies a macro to use instead of `override`.
+
+This is useful when maintaining source code that also needs to compile with a pre-C++11 compiler.
+
+##### `FinalSpelling`
+
+Specifies a macro to use instead of `final`.
+
+This is useful when maintaining source code that also needs to compile with a pre-C++11 compiler.
+
+#### Note
+
+For more information on the use of `override` see https://en.cppreference.com/w/cpp/language/override
+
+### modernize-use-std-print
+
+Converts calls to `printf`, `fprintf`, `absl::PrintF` and `absl::FPrintf` to equivalent calls to C++23’s `std::print` or `std::println` as appropriate, modifying the format string appropriately. The replaced and replacement functions can be customised by configuration options. Each argument that is the result of a call to `std::string::c_str()` and `std::string::data()` will have that now-unnecessary call removed in a similar manner to the readability-redundant-string-cstr check.
+
+In other words, it turns lines like:
+
+```
+fprintf(stderr, "The %s is %3d\n", description.c_str(), value);
+```
+
+into:
+
+```
+std::println(stderr, "The {} is {:3}", description, value);
+```
+
+If the ReplacementPrintFunction or ReplacementPrintlnFunction options are left, or assigned to their default values then this check is only enabled with -std=c++23 or later.
+
+The check doesn’t do a bad job, but it’s not perfect. In particular:
+
+- It assumes that the format string is correct for the arguments. If you get any warnings when compiling with -Wformat then misbehaviour is possible.
+- At the point that the check runs, the AST contains a single `StringLiteral` for the format string and any macro expansion, token pasting, adjacent string literal concatenation and escaping has been handled. Although it’s possible for the check to automatically put the escapes back, they may not be exactly as they were written (e.g. `"\x0a"` will become `"\n"` and `"ab" "cd"` will become `"abcd"`.) This is helpful since it means that the `PRIx` macros from `<inttypes.h>` are removed correctly.
+- It supports field widths, precision, positional arguments, leading zeros, leading `+`, alignment and alternative forms.
+- Use of any unsupported flags or specifiers will cause the entire statement to be left alone and a warning to be emitted. Particular unsupported features are:
+  - The `%'` flag for thousands separators.
+  - The glibc extension `%m`.
+- `printf` and similar functions return the number of characters printed. `std::print` does not. This means that any invocations that use the return value will not be converted. Unfortunately this currently includes explicitly-casting to `void`. Deficiencies in this check mean that any invocations inside `GCC` compound statements cannot be converted even if the resulting value is not used.
+
+If conversion would be incomplete or unsafe then the entire invocation will be left unchanged.
+
+If the call is deemed suitable for conversion then:
+
+- `printf`, `fprintf`, `absl::PrintF`, `absl::FPrintF` and any functions specified by the PrintfLikeFunctions option or FprintfLikeFunctions are replaced with the function specified by the ReplacementPrintlnFunction option if the format string ends with `\n` or ReplacementPrintFunction otherwise.
+- the format string is rewritten to use the `std::formatter` language. If a `\n` is found at the end of the format string not preceded by `r` then it is removed and ReplacementPrintlnFunction is used rather than ReplacementPrintFunction.
+- any arguments that corresponded to `%p` specifiers that `std::formatter` wouldn’t accept are wrapped in a `static_cast` to `const void *`.
+- any arguments that corresponded to `%s` specifiers where the argument is of `signed char` or `unsigned char` type are wrapped in a `reinterpret_cast<const char *>`.
+- any arguments where the format string and the parameter differ in signedness will be wrapped in an appropriate `static_cast` if StrictMode is enabled.
+- any arguments that end in a call to `std::string::c_str()` or `std::string::data()` will have that call removed.
+
+#### Options
+
+##### `StrictMode`
+
+When true, the check will add casts when converting from variadic functions like `printf` and printing signed or unsigned integer types (including fixed-width integer types from `<cstdint>`, `ptrdiff_t`, `size_t` and `ssize_t`) as the opposite signedness to ensure that the output matches that of `printf`. This does not apply when converting from non-variadic functions such as `absl::PrintF` and `fmt::printf`. For example, with StrictMode enabled:`int i = -42; unsigned int u = 0xffffffff; printf("%d %u\n", i, u); `would be converted to:`std::print("{} {}\n", static_cast<unsigned int>(i), static_cast<int>(u)); `to ensure that the output will continue to be the unsigned representation of -42 and the signed representation of 0xffffffff (often 4294967254 and -1 respectively.) When false (which is the default), these casts will not be added which may cause a change in the output.
+
+##### `PrintfLikeFunctions`
+
+A semicolon-separated list of (fully qualified) extra function names to replace, with the requirement that the first parameter contains the printf-style format string and the arguments to be formatted follow immediately afterwards. If neither this option nor FprintfLikeFunctions are set then the default value for this option is printf; absl::PrintF, otherwise it is empty.
+
+##### `FprintfLikeFunctions`
+
+A semicolon-separated list of (fully qualified) extra function names to replace, with the requirement that the first parameter is retained, the second parameter contains the printf-style format string and the arguments to be formatted follow immediately afterwards. If neither this option nor PrintfLikeFunctions are set then the default value for this option is fprintf; absl::FPrintF, otherwise it is empty.
+
+##### `ReplacementPrintFunction`
+
+The function that will be used to replace `printf`, `fprintf` etc. during conversion rather than the default `std::print` when the originalformat string does not end with `\n`. It is expected that the function provides an interface that is compatible with `std::print`. A suitable candidate would be `fmt::print`.
+
+##### `ReplacementPrintlnFunction`
+
+The function that will be used to replace `printf`, `fprintf` etc. during conversion rather than the default `std::println` when the original format string ends with `\n`. It is expected that the function provides an interface that is compatible with `std::println`. A suitable candidate would be `fmt::println`.
+
+##### `PrintHeader`
+
+The header that must be included for the declaration of ReplacementPrintFunction so that a `#include` directive can be added if required. If ReplacementPrintFunction is `std::print` then this option will default to `<print>`, otherwise this option will default to nothing and no `#include` directive will be added.
+
+
+
+
+
+
+
+
+
+
 
 ### modernize-use-trailing-return-type
 
@@ -2659,15 +6684,800 @@ This code fails to compile because the `S` in the context of f refers to the equ
 >
 >该检查目前只能检测并避免与函数参数名冲突。
 
+### modernize-use-transparent-functors
+
+Prefer transparent functors to non-transparent ones. When using transparent functors, the type does not need to be repeated. The code is easier to read, maintain and less prone to errors. It is not possible to introduce unwanted conversions.
+
+```
+// Non-transparent functor
+std::map<int, std::string, std::greater<int>> s;
+
+// Transparent functor.
+std::map<int, std::string, std::greater<>> s;
+
+// Non-transparent functor
+using MyFunctor = std::less<MyType>;
+```
+
+It is not always a safe transformation though. The following case will be untouched to preserve the semantics.
+
+```
+// Non-transparent functor
+std::map<const char *, std::string, std::greater<std::string>> s;
+```
+
+#### Options
+
+##### `SafeMode`
+
+If the option is set to true, the check will not diagnose cases where using a transparent functor cannot be guaranteed to produce identical results as the original code. The default value for this option is false.
+
+This check requires using C++14 or higher to run.
+
+### modernize-use-uncaught-exceptions
+
+This check will warn on calls to `std::uncaught_exception` and replace them with calls to `std::uncaught_exceptions`, since `std::uncaught_exception` was deprecated in C++17.
+
+Below are a few examples of what kind of occurrences will be found and what they will be replaced with.
+
+```
+#define MACRO1 std::uncaught_exception
+#define MACRO2 std::uncaught_exception
+
+int uncaught_exception() {
+  return 0;
+}
+
+int main() {
+  int res;
+
+  res = uncaught_exception();
+  // No warning, since it is not the deprecated function from namespace std
+
+  res = MACRO2();
+  // Warning, but will not be replaced
+
+  res = std::uncaught_exception();
+  // Warning and replaced
+
+  using std::uncaught_exception;
+  // Warning and replaced
+
+  res = uncaught_exception();
+  // Warning and replaced
+}
+```
+
+After applying the fixes the code will look like the following:
+
+```
+#define MACRO1 std::uncaught_exception
+#define MACRO2 std::uncaught_exception
+
+int uncaught_exception() {
+  return 0;
+}
+
+int main() {
+  int res;
+
+  res = uncaught_exception();
+
+  res = MACRO2();
+
+  res = std::uncaught_exceptions();
+
+  using std::uncaught_exceptions;
+
+  res = uncaught_exceptions();
+}
+```
+
+### modernize-use-using
+
+The check converts the usage of `typedef` with `using` keyword.
+
+Before:
+
+```
+typedef int variable;
+
+class Class{};
+typedef void (Class::* MyPtrType)() const;
+
+typedef struct { int a; } R_t, *R_p;
+```
+
+After:
+
+```
+using variable = int;
+
+class Class{};
+using MyPtrType = void (Class::*)() const;
+
+using R_t = struct { int a; };
+using R_p = R_t*;
+```
+
+This check requires using C++11 or higher to run.
+
+#### Options
+
+##### `IgnoreMacros`
+
+If set to true, the check will not give warnings inside macros.
+
+Default is true.
+
 ## performance-*
 
 Checks that target performance-related issues.
+
+### performance-avoid-endl
+
+Checks for uses of `std::endl` on streams and suggests using the newline character `'\n'` instead.
+
+Rationale: Using `std::endl` on streams can be less efficient than using the newline character `'\n'` because `std::endl` performs two operations: it writes a newline character to the output stream and then flushes the stream buffer. Writing a single newline character using `'\n'` does not trigger a flush, which can improve performance. In addition, flushing the stream buffer can cause additional overhead when working with streams that are buffered.
+
+Example:
+
+Consider the following code:
+
+```
+#include <iostream>
+
+int main() {
+  std::cout << "Hello" << std::endl;
+}
+```
+
+Which gets transformed into:
+
+```
+#include <iostream>
+
+int main() {
+  std::cout << "Hello" << '\n';
+}
+```
+
+This code writes a single newline character to the `std::cout` stream without flushing the stream buffer.
+
+Additionally, it is important to note that the standard C++ streams (like `std::cerr`, `std::wcerr`, `std::clog` and `std::wclog`) always flush after a write operation, unless `std::ios_base::sync_with_stdio` is set to `false`. regardless of whether `std::endl` or `'\n'` is used. Therefore, using `'\n'` with these streams will not result in any performance gain, but it is still recommended to use `'\n'` for consistency and readability.
+
+If you do need to flush the stream buffer, you can use `std::flush` explicitly like this:
+
+```
+#include <iostream>
+
+int main() {
+  std::cout << "Hello\n" << std::flush;
+}
+```
+
+### performance-enum-size
+
+Recommends the smallest possible underlying type for an `enum` or `enum` class based on the range of its enumerators. Analyzes the values of the enumerators in an `enum` or `enum` class, including signed values, to recommend the smallest possible underlying type that can represent all the values of the `enum`. The suggested underlying types are the integral types `std::uint8_t`, `std::uint16_t`, and `std::uint32_t` for unsigned types, and `std::int8_t`, `std::int16_t`, and `std::int32_t` for signed types. Using the suggested underlying types can help reduce the memory footprint of the program and improve performance in some cases.
+
+For example:
+
+```
+// BEFORE
+enum Color {
+    RED = -1,
+    GREEN = 0,
+    BLUE = 1
+};
+
+std::optional<Color> color_opt;
+```
+
+The Color `enum` uses the default underlying type, which is `int` in this case, and its enumerators have values of -1, 0, and 1. Additionally, the `std::optional<Color>` object uses 8 bytes due to padding (platform dependent).
+
+```
+// AFTER
+enum Color : std:int8_t {
+    RED = -1,
+    GREEN = 0,
+    BLUE = 1
+}
+
+std::optional<Color> color_opt;
+```
+
+In the revised version of the Color `enum`, the underlying type has been changed to `std::int8_t`. The enumerator RED has a value of -1, which can be represented by a signed 8-bit integer.
+
+By using a smaller underlying type, the memory footprint of the Color `enum` is reduced from 4 bytes to 1 byte. The revised version of the `std::optional<Color>` object would only require 2 bytes (due to lack of padding), since it contains a single byte for the Color `enum` and a single byte for the `bool` flag that indicates whether the optional value is set.
+
+Reducing the memory footprint of an `enum` can have significant benefits in terms of memory usage and cache performance. However, it’s important to consider the trade-offs and potential impact on code readability and maintainability.
+
+Enums without enumerators (empty) are excluded from analysis.
+
+Requires C++11 or above. Does not provide auto-fixes.
+
+#### Options
+
+##### `EnumIgnoreList`
+
+Option is used to ignore certain enum types. It accepts a semicolon-separated list of (fully qualified) enum type names or regular expressions that match the enum type names.
+
+The default value is an empty string, which means no enums will be ignored.
+
+### performance-faster-string-find
+
+Optimize calls to `std::string::find()` and friends when the needle passed is a single character string literal. The character literal overload is more efficient.
+
+Examples:
+
+```
+str.find("A");
+
+// becomes
+
+str.find('A');
+```
+
+#### Options
+
+##### `StringLikeClasses`
+
+Semicolon-separated list of names of string-like classes.
+
+By default only `::std::basic_string` and `::std::basic_string_view` are considered.
+
+The check will only consider member functions named `find`, `rfind`, `find_first_of`, `find_first_not_of`, `find_last_of`, or `find_last_not_of` within these classes.
+
+### performance-for-range-copy
+
+Finds C++11 for ranges where the loop variable is copied in each iteration but it would suffice to obtain it by const reference.
+
+The check is only applied to loop variables of types that are expensive to copy which means they are not trivially copyable or have a non-trivial copy constructor or destructor.
+
+To ensure that it is safe to replace the copy with a const reference the following heuristic is employed:
+
+1. The loop variable is const qualified.
+2. The loop variable is not const, but only const methods or operators are invoked on it, or it is used as const reference or value argument in constructors or function calls.
+
+#### Options
+
+##### `WarnOnAllAutoCopies`
+
+When true, warns on any use of auto as the type of the range-based for loop variable.
+
+Default is false.
+
+##### `AllowedTypes`
+
+A semicolon-separated list of names of types allowed to be copied in each iteration. Regular expressions are accepted, e.g. [Rr]ef(erence)?$ matches every type with suffix Ref, ref, Reference and reference.
+
+The default is empty.
+
+If a name in the list contains the sequence :: it is matched against the qualified typename (i.e. namespace::Type, otherwise it is matched against only the type name (i.e. Type).
+
+### performance-implicit-conversion-in-loop
+
+This warning appears in a range-based loop with a loop variable of const ref type where the type of the variable does not match the one returned by the iterator. This means that an implicit conversion happens, which can for example result in expensive deep copies.
+
+Example:
+
+```
+map<int, vector<string>> my_map;
+for (const pair<int, vector<string>>& p : my_map) {}
+// The iterator type is in fact pair<const int, vector<string>>, which means
+// that the compiler added a conversion, resulting in a copy of the vectors.
+```
+
+The easiest solution is usually to use `const auto&` instead of writing the type manually.
+
+### performance-inefficient-algorithm
+
+Warns on inefficient use of STL algorithms on associative containers.
+
+Associative containers implement some of the algorithms as methods which should be preferred to the algorithms in the algorithm header. The methods can take advantage of the order of the elements.
+
+```c++
+std::set<int> s;
+auto it = std::find(s.begin(), s.end(), 43);
+
+// becomes
+
+auto it = s.find(43);
+```
+
+```c++
+std::set<int> s;
+auto c = std::count(s.begin(), s.end(), 43);
+
+// becomes
+
+auto c = s.count(43);
+```
+
+### performance-inefficient-string-concatenation
+
+This check warns about the performance overhead arising from concatenating strings using the `operator+`, for instance:
+
+```
+std::string a("Foo"), b("Bar");
+a = a + b;
+```
+
+Instead of this structure you should use `operator+=` or `std::string`’s (`std::basic_string`) class member function `append()`. For instance:
+
+```
+std::string a("Foo"), b("Baz");
+for (int i = 0; i < 20000; ++i) {
+    a = a + "Bar" + b;
+}
+```
+
+Could be rewritten in a greatly more efficient way like:
+
+```
+std::string a("Foo"), b("Baz");
+for (int i = 0; i < 20000; ++i) {
+    a.append("Bar").append(b);
+}
+```
+
+And this can be rewritten too:
+
+```
+void f(const std::string&) {}
+std::string a("Foo"), b("Baz");
+void g() {
+    f(a + "Bar" + b);
+}
+```
+
+In a slightly more efficient way like:
+
+```
+void f(const std::string&) {}
+std::string a("Foo"), b("Baz");
+void g() {
+    f(std::string(a).append("Bar").append(b));
+}
+```
+
+#### Options
+
+##### `StrictMode`
+
+When false, the check will only check the string usage in `while`, `for` and `for-range` statements.
+
+Default is false.
+
+### performance-inefficient-vector-operation
+
+Finds possible inefficient `std::vector` operations (e.g. `push_back`, `emplace_back`) that may cause unnecessary memory reallocations.
+
+It can also find calls that add element to protobuf repeated field in a loop without calling Reserve() before the loop. Calling Reserve() first can avoid unnecessary memory reallocations.
+
+Currently, the check only detects following kinds of loops with a single statement body:
+
+- Counter-based for loops start with 0:
+
+```
+std::vector<int> v;
+for (int i = 0; i < n; ++i) {
+  v.push_back(n);
+  // This will trigger the warning since the push_back may cause multiple
+  // memory reallocations in v. This can be avoid by inserting a 'reserve(n)'
+  // statement before the for statement.
+}
+
+SomeProto p;
+for (int i = 0; i < n; ++i) {
+  p.add_xxx(n);
+  // This will trigger the warning since the add_xxx may cause multiple memory
+  // reallocations. This can be avoid by inserting a
+  // 'p.mutable_xxx().Reserve(n)' statement before the for statement.
+}
+```
+
+- For-range loops like `for (range-declaration : range_expression)`, the type of `range_expression` can be `std::vector`, `std::array`, `std::deque`, `std::set`, `std::unordered_set`, `std::map`, `std::unordered_set`:
+
+```
+std::vector<int> data;
+std::vector<int> v;
+
+for (auto element : data) {
+  v.push_back(element);
+  // This will trigger the warning since the 'push_back' may cause multiple
+  // memory reallocations in v. This can be avoid by inserting a
+  // 'reserve(data.size())' statement before the for statement.
+}
+```
+
+#### Options
+
+##### `VectorLikeClasses`
+
+Semicolon-separated list of names of vector-like classes.
+
+By default only `::std::vector` is considered.
+
+##### `EnableProto`
+
+When true, the check will also warn on inefficient operations for proto repeated fields.
+
+Otherwise, the check only warns on inefficient vector operations.
+
+Default is false.
+
+### performance-move-const-arg
+
+The check warns
+
+- if `std::move()` is called with a constant argument,
+- if `std::move()` is called with an argument of a trivially-copyable type,
+- if the result of `std::move()` is passed as a const reference argument.
+
+In all three cases, the check will suggest a fix that removes the `std::move()`.
+
+Here are examples of each of the three cases:
+
+```
+const string s;
+return std::move(s);  // Warning: std::move of the const variable has no effect
+
+int x;
+return std::move(x);  // Warning: std::move of the variable of a trivially-copyable type has no effect
+
+void f(const string &s);
+string s;
+f(std::move(s));  // Warning: passing result of std::move as a const reference argument; no move will actually happen
+```
+
+#### Options
+
+##### `CheckTriviallyCopyableMove`
+
+If true, enables detection of trivially copyable types that do not have a move constructor.
+
+Default is true.
+
+##### `CheckMoveToConstRef`
+
+If true, enables detection of std::move() passed as a const reference argument.
+
+Default is true.
+
+### performance-move-constructor-init
+
+“cert-oop11-cpp” redirects here as an alias for this check.
+
+The check flags user-defined move constructors that have a ctor-initializer initializing a member or base class through a copy constructor instead of a move constructor.
+
+### performance-no-automatic-move
+
+Finds local variables that cannot be automatically moved due to constness.
+
+Under [certain conditions](https://en.cppreference.com/w/cpp/language/return#automatic_move_from_local_variables_and_parameters), local values are automatically moved out when returning from a function. A common mistake is to declare local `lvalue` variables `const`, which prevents the move.
+
+Example [[1\]](https://godbolt.org/z/x7SYYA):
+
+```
+StatusOr<std::vector<int>> Cool() {
+  std::vector<int> obj = ...;
+  return obj;  // calls StatusOr::StatusOr(std::vector<int>&&)
+}
+
+StatusOr<std::vector<int>> NotCool() {
+  const std::vector<int> obj = ...;
+  return obj;  // calls `StatusOr::StatusOr(const std::vector<int>&)`
+}
+```
+
+The former version (`Cool`) should be preferred over the latter (`NotCool`) as it will avoid allocations and potentially large memory copies.
+
+#### Semantics
+
+In the example above, `StatusOr::StatusOr(T&&)` have the same semantics as long as the copy and move constructors for `T` have the same semantics. Note that there is no guarantee that `S::S(T&&)` and `S::S(const T&)` have the same semantics for any single `S`, so we’re not providing automated fixes for this check, and judgement should be exerted when making the suggested changes.
+
+#### -Wreturn-std-move
+
+Another case where the move cannot happen is the following:
+
+```
+StatusOr<std::vector<int>> Uncool() {
+  std::vector<int>&& obj = ...;
+  return obj;  // calls `StatusOr::StatusOr(const std::vector<int>&)`
+}
+```
+
+In that case the fix is more consensual: just return std::move(obj). This is handled by the -Wreturn-std-move warning.
+
+### performance-no-int-to-ptr
+
+Diagnoses every integer to pointer cast.
+
+While casting an (integral) pointer to an integer is obvious - you just get the integral value of the pointer, casting an integer to an (integral) pointer is deceivingly different. While you will get a pointer with that integral value, if you got that integral value via a pointer-to-integer cast originally, the new pointer will lack the provenance information from the original pointer.
+
+So while (integral) pointer to integer casts are effectively no-ops, and are transparent to the optimizer, integer to (integral) pointer casts are *NOT* transparent, and may conceal information from optimizer.
+
+While that may be the intention, it is not always so. For example, let’s take a look at a routine to align the pointer up to the multiple of 16: The obvious, naive implementation for that is:
+
+```
+char* src(char* maybe_underbiased_ptr) {
+  uintptr_t maybe_underbiased_intptr = (uintptr_t)maybe_underbiased_ptr;
+  uintptr_t aligned_biased_intptr = maybe_underbiased_intptr + 15;
+  uintptr_t aligned_intptr = aligned_biased_intptr & (~15);
+  return (char*)aligned_intptr; // warning: avoid integer to pointer casts [performance-no-int-to-ptr]
+}
+```
+
+The check will rightfully diagnose that cast.
+
+But when provenance concealment is not the goal of the code, but an accident, this example can be rewritten as follows, without using integer to pointer cast:
+
+```
+char*
+tgt(char* maybe_underbiased_ptr) {
+    uintptr_t maybe_underbiased_intptr = (uintptr_t)maybe_underbiased_ptr;
+    uintptr_t aligned_biased_intptr = maybe_underbiased_intptr + 15;
+    uintptr_t aligned_intptr = aligned_biased_intptr & (~15);
+    uintptr_t bias = aligned_intptr - maybe_underbiased_intptr;
+    return maybe_underbiased_ptr + bias;
+}
+```
+
+### performance-noexcept-destructor
+
+The check flags user-defined destructors marked with `noexcept(expr)` where `expr` evaluates to `false` (but is not a `false` literal itself).
+
+When a destructor is marked as `noexcept`, it assures the compiler that no exceptions will be thrown during the destruction of an object, which allows the compiler to perform certain optimizations such as omitting exception handling code.
+
+### performance-noexcept-move-constructor
+
+The check flags user-defined move constructors and assignment operators not marked with `noexcept` or marked with `noexcept(expr)` where `expr` evaluates to `false` (but is not a `false` literal itself).
+
+Move constructors of all the types used with STL containers, for example, need to be declared `noexcept`. Otherwise STL will choose copy constructors instead. The same is valid for move assignment operations.
+
+### performance-noexcept-swap
+
+The check flags user-defined swap functions not marked with `noexcept` or marked with `noexcept(expr)` where `expr` evaluates to `false` (but is not a `false` literal itself).
+
+When a swap function is marked as `noexcept`, it assures the compiler that no exceptions will be thrown during the swapping of two objects, which allows the compiler to perform certain optimizations such as omitting exception handling code.
+
+### performance-trivially-destructible
+
+Finds types that could be made trivially-destructible by removing out-of-line defaulted destructor declarations.
+
+```
+struct A: TrivialType {
+  ~A(); // Makes A non-trivially-destructible.
+  TrivialType trivial_fields;
+};
+A::~A() = default;
+```
+
+### performance-type-promotion-in-math-fn
+
+Finds calls to C math library functions (from `math.h` or, in C++, `cmath`) with implicit `float` to `double` promotions.
+
+For example, warns on `::sin(0.f)`, because this function’s parameter is a double. You probably meant to call `std::sin(0.f)` (in C++), or `sinf(0.f)` (in C).
+
+```
+float a;
+asin(a);
+
+// becomes
+
+float a;
+std::asin(a);
+```
+
+### performance-unnecessary-copy-initialization
+
+Finds local variable declarations that are initialized using the copy constructor of a non-trivially-copyable type but it would suffice to obtain a const reference.
+
+The check is only applied if it is safe to replace the copy by a const reference. This is the case when the variable is const qualified or when it is only used as a const, i.e. only const methods or operators are invoked on it, or it is used as const reference or value argument in constructors or function calls.
+
+Example:
+
+```
+const string& constReference();
+void Function() {
+  // The warning will suggest making this a const reference.
+  const string UnnecessaryCopy = constReference();
+}
+
+struct Foo {
+  const string& name() const;
+};
+void Function(const Foo& foo) {
+  // The warning will suggest making this a const reference.
+  string UnnecessaryCopy1 = foo.name();
+  UnnecessaryCopy1.find("bar");
+
+  // The warning will suggest making this a const reference.
+  string UnnecessaryCopy2 = UnnecessaryCopy1;
+  UnnecessaryCopy2.find("bar");
+}
+```
+
+#### Options
+
+##### `AllowedTypes`
+
+A semicolon-separated list of names of types allowed to be initialized by copying. Regular expressions are accepted, e.g. [Rr]ef(erence)?$ matches every type with suffix Ref, ref, Reference and reference. The default is empty. If a name in the list contains the sequence :: it is matched against the qualified typename (i.e. namespace::Type, otherwise it is matched against only the type name (i.e. Type).
+
+##### `ExcludedContainerTypes`
+
+A semicolon-separated list of names of types whose methods are allowed to return the const reference the variable is copied from. When an expensive to copy variable is copy initialized by the return value from a type on this list the check does not trigger. This can be used to exclude types known to be const incorrect or where the lifetime or immutability of returned references is not tied to mutations of the container. An example are view types that don’t own the underlying data. Like for AllowedTypes above, regular expressions are accepted and the inclusion of :: determines whether the qualified typename is matched or not.
+
+### performance-unnecessary-value-param
+
+Flags value parameter declarations of expensive to copy types that are copied for each invocation but it would suffice to pass them by const reference.
+
+The check is only applied to parameters of types that are expensive to copy which means they are not trivially copyable or have a non-trivial copy constructor or destructor.
+
+To ensure that it is safe to replace the value parameter with a const reference the following heuristic is employed:
+
+1. the parameter is const qualified;
+2. the parameter is not const, but only const methods or operators are invoked on it, or it is used as const reference or value argument in constructors or function calls.
+
+Example:
+
+```
+void f(const string Value) {
+  // The warning will suggest making Value a reference.
+}
+
+void g(ExpensiveToCopy Value) {
+  // The warning will suggest making Value a const reference.
+  Value.ConstMethd();
+  ExpensiveToCopy Copy(Value);
+}
+```
+
+If the parameter is not const, only copied or assigned once and has a non-trivial move-constructor or move-assignment operator respectively the check will suggest to move it.
+
+Example:
+
+```
+void setValue(string Value) {
+  Field = Value;
+}
+```
+
+Will become:
+
+```
+#include <utility>
+
+void setValue(string Value) {
+  Field = std::move(Value);
+}
+```
+
+#### Options
+
+##### `IncludeStyle`
+
+A string specifying which include-style is used, llvm or google.
+
+Default is llvm.
+
+##### `AllowedTypes`
+
+A semicolon-separated list of names of types allowed to be passed by value. Regular expressions are accepted, e.g. [Rr]ef(erence)?$ matches every type with suffix Ref, ref, Reference and reference.
+
+The default is empty.
+
+If a name in the list contains the sequence :: it is matched against the qualified typename (i.e. namespace::Type, otherwise it is matched against only the type name (i.e. Type).
+
+
+
+
 
 ## portability-*
 
 Checks that target portability-related issues that don’t relate to any particular coding style.
 
 >针对与任何特定编码风格无关的可移植性相关问题的检查。
+
+### portability-restrict-system-includes
+
+Checks to selectively allow or disallow a configurable list of system headers.
+
+For example:
+
+In order to **only** allow zlib.h from the system you would set the options to -*,zlib.h.
+
+```
+#include <curses.h>       // Bad: disallowed system header.
+#include <openssl/ssl.h>  // Bad: disallowed system header.
+#include <zlib.h>         // Good: allowed system header.
+#include "src/myfile.h"   // Good: non-system header always allowed.
+```
+
+In order to allow everything **except** zlib.h from the system you would set the options to *,-zlib.h.
+
+```
+#include <curses.h>       // Good: allowed system header.
+#include <openssl/ssl.h>  // Good: allowed system header.
+#include <zlib.h>         // Bad: disallowed system header.
+#include "src/myfile.h"   // Good: non-system header always allowed.
+```
+
+Since the options support globbing you can use wildcarding to allow groups of headers.
+
+-*,openssl/*.h will allow all openssl headers but disallow any others.
+
+```
+#include <curses.h>       // Bad: disallowed system header.
+#include <openssl/ssl.h>  // Good: allowed system header.
+#include <openssl/rsa.h>  // Good: allowed system header.
+#include <zlib.h>         // Bad: disallowed system header.
+#include "src/myfile.h"   // Good: non-system header always allowed.
+```
+
+#### Options
+
+##### `Includes`
+
+A string containing a comma separated glob list of allowed include filenames. Similar to the -checks glob list for running clang-tidy itself, the two wildcard characters are * and -, to include and exclude globs, respectively.
+
+The default is `*`, which allows all includes.
+
+### portability-simd-intrinsics
+
+Finds SIMD intrinsics calls and suggests `std::experimental::simd` ([P0214](https://wg21.link/p0214)) alternatives.
+
+If the option [`Suggest`](https://clang.llvm.org/extra/clang-tidy/checks/portability/simd-intrinsics.html#cmdoption-arg-Suggest) is set to true, for
+
+```
+_mm_add_epi32(a, b); // x86
+vec_add(a, b);       // Power
+```
+
+the check suggests an alternative: `operator+` on `std::experimental::simd` objects.
+
+Otherwise, it just complains the intrinsics are non-portable (and there are [P0214](https://wg21.link/p0214) alternatives).
+
+Many architectures provide SIMD operations (e.g. x86 SSE/AVX, Power AltiVec/VSX, ARM NEON). It is common that SIMD code implementing the same algorithm, is written in multiple target-dispatching pieces to optimize for different architectures or micro-architectures.
+
+The C++ standard proposal [P0214](https://wg21.link/p0214) and its extensions cover many common SIMD operations. By migrating from target-dependent intrinsics to [P0214](https://wg21.link/p0214) operations, the SIMD code can be simplified and pieces for different targets can be unified.
+
+Refer to [P0214](https://wg21.link/p0214) for introduction and motivation for the data-parallel standard library.
+
+#### Options
+
+##### `Suggest`
+
+If this option is set to true (default is false), the check will suggest [P0214](https://wg21.link/p0214) alternatives, otherwise it only points out the intrinsic function is non-portable.
+
+##### `Std`
+
+The namespace used to suggest [P0214](https://wg21.link/p0214) alternatives.
+
+If not specified, std:: for -std=c++20 and std::experimental:: for -std=c++11.
+
+### portability-std-allocator-const
+
+Report use of `std::vector<const T>` (and similar containers of const elements). These are not allowed in standard C++, and should usually be `std::vector<T>` instead.”
+
+Per C++ `[allocator.requirements.general]`: “T is any cv-unqualified object type”, `std::allocator<const T>` is undefined. Many standard containers use `std::allocator` by default and therefore their `const T` instantiations are undefined.
+
+libc++ defines `std::allocator<const T>` as an extension which will be removed in the future.
+
+libstdc++ and MSVC do not support `std::allocator<const T>`:
+
+```c++
+// libstdc++ has a better diagnostic since https://gcc.gnu.org/bugzilla/show_bug.cgi?id=48101
+std::deque<const int> deque; // error: static assertion failed: std::deque must have a non-const, non-volatile value_type
+std::set<const int> set; // error: static assertion failed: std::set must have a non-const, non-volatile value_type
+std::vector<int* const> vector; // error: static assertion failed: std::vector must have a non-const, non-volatile value_type
+
+// MSVC
+// error C2338: static_assert failed: 'The C++ Standard forbids containers of const elements because allocator<const T> is ill-formed.'
+```
+
+Code bases only compiled with libc++ may accrue such undefined usage. This check finds such code and prevents backsliding while clean-up is ongoing.
 
 ## readability-*
 
