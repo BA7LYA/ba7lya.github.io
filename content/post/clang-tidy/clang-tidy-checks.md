@@ -4459,6 +4459,169 @@ struct AClass
 
 This check implements [F.54](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#f54-when-writing-a-lambda-that-captures-this-or-any-class-data-member-dont-use--default-capture) from the C++ Core Guidelines.
 
+### cppcoreguidelines-missing-std-forward
+
+Warns when a forwarding reference parameter is not forwarded inside the function body.
+
+Example:
+
+```
+template <class T>
+void wrapper(T&& t) {
+  impl(std::forward<T>(t), 1, 2); // Correct
+}
+
+template <class T>
+void wrapper2(T&& t) {
+  impl(t, 1, 2); // Oops - should use std::forward<T>(t)
+}
+
+template <class T>
+void wrapper3(T&& t) {
+  impl(std::move(t), 1, 2); // Also buggy - should use std::forward<T>(t)
+}
+
+template <class F>
+void wrapper_function(F&& f) {
+  std::forward<F>(f)(1, 2); // Correct
+}
+
+template <class F>
+void wrapper_function2(F&& f) {
+  f(1, 2); // Incorrect - may not invoke the desired qualified function operator
+}
+```
+
+This check implements [F.19](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rf-forward) from the C++ Core Guidelines.
+
+### cppcoreguidelines-narrowing-conversions
+
+Checks for silent narrowing conversions, e.g: `int i = 0; i += 0.1;`. While the issue is obvious in this former example, it might not be so in the following: `void MyClass::f(double d) { int_member_ += d; }`.
+
+This check implements [ES.46](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#es46-avoid-lossy-narrowing-truncating-arithmetic-conversions) from the C++ Core Guidelines.
+
+- We enforce only part of the guideline, more specifically, we flag narrowing conversions from:
+
+  an integer to a narrower integer (e.g. `char` to `unsigned char`) if WarnOnIntegerNarrowingConversion Option is set,an integer to a narrower floating-point (e.g. `uint64_t` to `float`) if WarnOnIntegerToFloatingPointNarrowingConversion Option is set,a floating-point to an integer (e.g. `double` to `int`),a floating-point to a narrower floating-point (e.g. `double` to `float`) if WarnOnFloatingPointNarrowingConversion Option is set.
+
+- This check will flag:
+
+  All narrowing conversions that are not marked by an explicit cast (c-style or `static_cast`). For example: `int i = 0; i += 0.1;`, `void f(int); f(0.1);`,All applications of binary operators with a narrowing conversions. For example: `int i; i+= 0.1;`.
+
+#### Options
+
+##### `WarnOnIntegerNarrowingConversion`
+
+When true, the check will warn on narrowing integer conversion (e.g. `int` to `size_t`). true by default.
+
+##### `WarnOnIntegerToFloatingPointNarrowingConversion`
+
+When true, the check will warn on narrowing integer to floating-point conversion (e.g. `size_t` to `double`). true by default.
+
+##### `WarnOnFloatingPointNarrowingConversion`
+
+When true, the check will warn on narrowing floating point conversion (e.g. `double` to `float`). true by default.
+
+##### `WarnWithinTemplateInstantiation`
+
+When true, the check will warn on narrowing conversions within template instantiations. false by default.
+
+##### `WarnOnEquivalentBitWidth`
+
+When true, the check will warn on narrowing conversions that arise from casting between types of equivalent bit width. (e.g. int n = uint(0); or long long n = double(0);) true by default.
+
+##### `IgnoreConversionFromTypes`
+
+Narrowing conversions from any type in this semicolon-separated list will be ignored. This may be useful to weed out commonly occurring, but less commonly problematic assignments such as int n = std::vector<char>().size(); or int n = std::difference(it1, it2);. The default list is empty, but one suggested list for a legacy codebase would be size_t;ptrdiff_t;size_type;difference_type.
+
+##### `PedanticMode`
+
+When true, the check will warn on assigning a floating point constant to an integer value even if the floating point value is exactly representable in the destination type (e.g. `int i = 1.0;`). false by default.
+
+#### FAQ
+
+- What does “narrowing conversion from ‘int’ to ‘float’” mean?
+
+An IEEE754 Floating Point number can represent all integer values in the range [-2^PrecisionBits, 2^PrecisionBits] where PrecisionBits is the number of bits in the mantissa.
+
+For `float` this would be [-2^23, 2^23], where `int` can represent values in the range [-2^31, 2^31-1].
+
+- What does “implementation-defined” mean?
+
+You may have encountered messages like “narrowing conversion from ‘unsigned int’ to signed type ‘int’ is implementation-defined”. The C/C++ standard does not mandate two’s complement for signed integers, and so the compiler is free to define what the semantics are for converting an unsigned integer to signed integer. Clang’s implementation uses the two’s complement format.
+
+### cppcoreguidelines-no-malloc
+
+This check handles C-Style memory management using `malloc()`, `realloc()`, `calloc()` and `free()`. It warns about its use and tries to suggest the use of an appropriate RAII object. Furthermore, it can be configured to check against a user-specified list of functions that are used for memory management (e.g. `posix_memalign()`).
+
+This check implements [R.10](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-mallocfree) from the C++ Core Guidelines.
+
+There is no attempt made to provide fix-it hints, since manual resource management isn’t easily transformed automatically into RAII.
+
+```
+// Warns each of the following lines.
+// Containers like std::vector or std::string should be used.
+char* some_string = (char*) malloc(sizeof(char) * 20);
+char* some_string = (char*) realloc(sizeof(char) * 30);
+free(some_string);
+
+int* int_array = (int*) calloc(30, sizeof(int));
+
+// Rather use a smartpointer or stack variable.
+struct some_struct* s = (struct some_struct*) malloc(sizeof(struct some_struct));
+```
+
+#### Options
+
+##### `Allocations`
+
+Semicolon-separated list of fully qualified names of memory allocation functions.
+
+Defaults to `::malloc;::calloc`.
+
+##### `Deallocations`
+
+Semicolon-separated list of fully qualified names of memory allocation functions.
+
+Defaults to `::free`.
+
+##### `Reallocations`
+
+Semicolon-separated list of fully qualified names of memory allocation functions.
+
+Defaults to `::realloc`.
+
+### cppcoreguidelines-no-suspend-with-lock
+
+Flags coroutines that suspend while a lock guard is in scope at the suspension point.
+
+When a coroutine suspends, any mutexes held by the coroutine will remain locked until the coroutine resumes and eventually destructs the lock guard. This can lead to long periods with a mutex held and runs the risk of deadlock.
+
+Instead, locks should be released before suspending a coroutine.
+
+This check only checks suspending coroutines while a lock_guard is in scope; it does not consider manual locking or unlocking of mutexes, e.g., through calls to `std::mutex::lock()`.
+
+Examples:
+
+```
+future bad_coro() {
+  std::lock_guard lock{mtx};
+  ++some_counter;
+  co_await something(); // Suspending while holding a mutex
+}
+
+future good_coro() {
+  {
+    std::lock_guard lock{mtx};
+    ++some_counter;
+  }
+  // Destroy the lock_guard to release the mutex before suspending the coroutine
+  co_await something(); // Suspending while holding a mutex
+}
+```
+
+This check implements [CP.52](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcoro-locks) from the C++ Core Guidelines.
+
 ### cppcoreguidelines-owning-memory
 
 This check implements the type-based semantics of `gsl::owner<T*>`, which allows static analysis on code, that uses raw pointers to handle resources like dynamic memory, but won’t introduce RAII concepts.
@@ -4639,6 +4802,416 @@ The semantic of a `gsl::owner<T*>` is mostly like a `std::unique_ptr<T>`, theref
 >`gsl::owner<T*>`的语义很像`std::unique_ptr<T>`，因此两个`gsl::owner<T*>`的赋值被认为是一次移动，这要求资源`Owner2`必须在赋值之前被释放。这种情况可以在以后用流量敏感分析改进。目前，Clang静态分析器可以捕获动态内存的这个错误，但不能捕获一般类型的资源。
 
 >注：还是用`std::unique_ptr<T>`吧。
+
+### cppcoreguidelines-prefer-member-initializer
+
+Finds member initializations in the constructor body which can be converted into member initializers of the constructor instead. This not only improves the readability of the code but also positively affects its performance. Class-member assignments inside a control statement or following the first control statement are ignored.
+
+This check implements [C.49](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c49-prefer-initialization-to-assignment-in-constructors) from the C++ Core Guidelines.
+
+If the language version is C++ 11 or above, the constructor is the default constructor of the class, the field is not a bitfield (only in case of earlier language version than C++ 20), furthermore the assigned value is a literal, negated literal or `enum` constant then the preferred place of the initialization is at the class member declaration.
+
+This latter rule is [C.48](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c48-prefer-in-class-initializers-to-member-initializers-in-constructors-for-constant-initializers) from the C++ Core Guidelines.
+
+Please note, that this check does not enforce this latter rule for initializations already implemented as member initializers. For that purpose see check [modernize-use-default-member-init](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-default-member-init.html).
+
+Note
+
+Enforcement of rule C.48 in this check is deprecated, to be removed in **clang-tidy** version 19 (only C.49 will be enforced by this check then). Please use [cppcoreguidelines-use-default-member-init](https://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines/use-default-member-init.html) to enforce rule C.48.
+
+#### Example 1
+
+```
+class C {
+  int n;
+  int m;
+public:
+  C() {
+    n = 1; // Literal in default constructor
+    if (dice())
+      return;
+    m = 1;
+  }
+};
+```
+
+Here `n` can be initialized using a default member initializer, unlike `m`, as `m`’s initialization follows a control statement (`if`):
+
+```
+class C {
+  int n{1};
+  int m;
+public:
+  C() {
+    if (dice())
+      return;
+    m = 1;
+  }
+};
+```
+
+#### Example 2
+
+```
+class C {
+  int n;
+  int m;
+public:
+  C(int nn, int mm) {
+    n = nn; // Neither default constructor nor literal
+    if (dice())
+      return;
+    m = mm;
+  }
+};
+```
+
+Here `n` can be initialized in the constructor initialization list, unlike `m`, as `m`’s initialization follows a control statement (`if`):
+
+```
+C(int nn, int mm) : n(nn) {
+  if (dice())
+    return;
+  m = mm;
+}
+```
+
+#### Options
+
+##### `UseAssignment`
+
+Note: this option is deprecated, to be removed in **clang-tidy** version 19. Please use the UseAssignment option from [cppcoreguidelines-use-default-member-init](https://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines/use-default-member-init.html) instead.If this option is set to true (by default UseAssignment from [modernize-use-default-member-init](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-default-member-init.html) will be used), the check will initialize members with an assignment. In this case the fix of the first example looks like this:
+
+```
+class C {
+  int n = 1;
+  int m;
+public:
+  C() {
+    if (dice())
+      return;
+    m = 1;
+  }
+};
+```
+
+### cppcoreguidelines-pro-bounds-array-to-pointer-decay
+
+This check flags all array to pointer decays.
+
+Pointers should not be used as arrays. `span<T>` is a bounds-checked, safe alternative to using pointers to access arrays.
+
+This rule is part of the [Bounds safety (Bounds 3)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-bounds-decay) profile from the C++ Core Guidelines.
+
+### cppcoreguidelines-pro-bounds-constant-array-index
+
+This check flags all array subscript expressions on static arrays and `std::arrays` that either do not have a constant integer expression index or are out of bounds (for `std::array`). For out-of-bounds checking of static arrays, see the -Warray-bounds Clang diagnostic.
+
+This rule is part of the [Bounds safety (Bounds 2)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-bounds-arrayindex) profile from the C++ Core Guidelines.
+
+Optionally, this check can generate fixes using `gsl::at` for indexing.
+
+#### Options
+
+##### `GslHeader`
+
+The check can generate fixes after this option has been set to the name of the include file that contains `gsl::at()`, e.g. “gsl/gsl.h”.
+
+##### `IncludeStyle`
+
+A string specifying which include-style is used, llvm or google.
+
+Default is llvm.
+
+### cppcoreguidelines-pro-bounds-pointer-arithmetic
+
+This check flags all usage of pointer arithmetic, because it could lead to an invalid pointer. Subtraction of two pointers is not flagged by this check.
+
+Pointers should only refer to single objects, and pointer arithmetic is fragile and easy to get wrong. `span<T>` is a bounds-checked, safe type for accessing arrays of data.
+
+This rule is part of the [Bounds safety (Bounds 1)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-bounds-arithmetic) profile from the C++ Core Guidelines.
+
+### cppcoreguidelines-pro-type-const-cast
+
+Imposes limitations on the use of `const_cast` within C++ code. It depends on the [`StrictMode`](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/argument-comment.html#cmdoption-arg-StrictMode) option setting to determine whether it should flag all instances of `const_cast` or only those that remove either `const` or `volatile` qualifier.
+
+Modifying a variable that has been declared as `const` in C++ is generally considered undefined behavior, and this remains true even when using `const_cast`. In C++, the `const` qualifier indicates that a variable is intended to be read-only, and the compiler enforces this by disallowing any attempts to change the value of that variable.
+
+Removing the `volatile` qualifier in C++ can have serious consequences. This qualifier indicates that a variable’s value can change unpredictably, and removing it may lead to undefined behavior, optimization problems, and debugging challenges. It’s essential to retain the `volatile` qualifier in situations where the variable’s volatility is a crucial aspect of program correctness and reliability.
+
+This rule is part of the [Type safety (Type 3)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-type-constcast) profile and [ES.50: Don’t cast away const](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#es50-dont-cast-away-const) rule from the C++ Core Guidelines.
+
+#### Options
+
+##### `StrictMode`
+
+When this setting is set to true, it means that any usage of `const_cast` is not allowed.
+
+On the other hand, when it’s set to false, it permits casting to `const` or `volatile` types.
+
+Default value is false.
+
+### cppcoreguidelines-pro-type-cstyle-cast
+
+This check flags all use of C-style casts that perform a `static_cast` downcast, `const_cast`, or `reinterpret_cast`.
+
+Use of these casts can violate type safety and cause the program to access a variable that is actually of type X to be accessed as if it were of an unrelated type Z. Note that a C-style `(T)expression` cast means to perform the first of the following that is possible: a `const_cast`, a `static_cast`, a `static_cast` followed by a `const_cast`, a `reinterpret_cast`, or a `reinterpret_cast` followed by a `const_cast`. This rule bans `(T)expression` only when used to perform an unsafe cast.
+
+This rule is part of the [Type safety (Type.4)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-type-cstylecast) profile from the C++ Core Guidelines.
+
+### cppcoreguidelines-pro-type-member-init
+
+The check flags user-defined constructor definitions that do not initialize all fields that would be left in an undefined state by default construction, e.g. builtins, pointers and record types without user-provided default constructors containing at least one such type. If these fields aren’t initialized, the constructor will leave some of the memory in an undefined state.
+
+For C++11 it suggests fixes to add in-class field initializers. For older versions it inserts the field initializers into the constructor initializer list. It will also initialize any direct base classes that need to be zeroed in the constructor initializer list.
+
+The check takes assignment of fields in the constructor body into account but generates false positives for fields initialized in methods invoked in the constructor body.
+
+The check also flags variables with automatic storage duration that have record types without a user-provided constructor and are not initialized. The suggested fix is to zero initialize the variable via `{}` for C++11 and beyond or `= {}` for older language versions.
+
+#### Options
+
+##### `IgnoreArrays`
+
+If set to true, the check will not warn about array members that are not zero-initialized during construction. For performance critical code, it may be important to not initialize fixed-size array members. Default is false.
+
+##### `UseAssignment`
+
+If set to true, the check will provide fix-its with literal initializers ( `int i = 0;` ) instead of curly braces ( `int i{};` ).
+
+This rule is part of the [Type safety (Type.6)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-type-memberinit) profile from the C++ Core Guidelines.
+
+### cppcoreguidelines-pro-type-reinterpret-cast
+
+This check flags all uses of `reinterpret_cast` in C++ code.
+
+Use of these casts can violate type safety and cause the program to access a variable that is actually of type `X` to be accessed as if it were of an unrelated type `Z`.
+
+This rule is part of the [Type safety (Type.1.1)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-type-reinterpretcast) profile from the C++ Core Guidelines.
+
+### cppcoreguidelines-pro-type-static-cast-downcast
+
+This check flags all usages of `static_cast`, where a base class is casted to a derived class. In those cases, a fix-it is provided to convert the cast to a `dynamic_cast`.
+
+Use of these casts can violate type safety and cause the program to access a variable that is actually of type `X` to be accessed as if it were of an unrelated type `Z`.
+
+This rule is part of the [Type safety (Type.2)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-type-downcast) profile from the C++ Core Guidelines.
+
+#### Options
+
+##### `StrictMode`
+
+When set to false, no warnings are emitted for casts on non-polymorphic types. Default is true.
+
+### cppcoreguidelines-pro-type-union-access
+
+This check flags all access to members of unions. Passing unions as a whole is not flagged.
+
+Reading from a union member assumes that member was the last one written, and writing to a union member assumes another member with a nontrivial destructor had its destructor called. This is fragile because it cannot generally be enforced to be safe in the language and so relies on programmer discipline to get it right.
+
+This rule is part of the [Type safety (Type.7)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-type-unions) profile from the C++ Core Guidelines.
+
+### cppcoreguidelines-pro-type-vararg
+
+This check flags all calls to c-style vararg functions and all use of `va_arg`.
+
+To allow for SFINAE use of vararg functions, a call is not flagged if a literal 0 is passed as the only vararg argument or function is used in unevaluated context.
+
+Passing to varargs assumes the correct type will be read. This is fragile because it cannot generally be enforced to be safe in the language and so relies on programmer discipline to get it right.
+
+This rule is part of the [Type safety (Type.8)](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Pro-type-varargs) profile from the C++ Core Guidelines.
+
+### cppcoreguidelines-rvalue-reference-param-not-moved
+
+Warns when an rvalue reference function parameter is never moved within the function body.
+
+Rvalue reference parameters indicate a parameter that should be moved with `std::move` from within the function body. Any such parameter that is never moved is confusing and potentially indicative of a buggy program.
+
+Example:
+
+```
+void logic(std::string&& Input) {
+  std::string Copy(Input); // Oops - forgot to std::move
+}
+```
+
+Note that parameters that are unused and marked as such will not be diagnosed.
+
+Example:
+
+```
+void conditional_use([[maybe_unused]] std::string&& Input) {
+  // No diagnostic here since Input is unused and marked as such
+}
+```
+
+#### Options
+
+##### `AllowPartialMove`
+
+If set to true, the check accepts `std::move` calls containing any subexpression containing the parameter. CppCoreGuideline F.18 officially mandates that the parameter itself must be moved. Default is false.
+
+```c++
+// 'p' is flagged by this check if and only if AllowPartialMove is false
+void move_members_of(pair<Obj, Obj>&& p) {
+  pair<Obj, Obj> other;
+  other.first = std::move(p.first);
+  other.second = std::move(p.second);
+}
+
+// 'p' is never flagged by this check
+void move_whole_pair(pair<Obj, Obj>&& p) {
+  pair<Obj, Obj> other = std::move(p);
+}
+```
+
+##### `IgnoreUnnamedParams`
+
+If set to true, the check ignores unnamed rvalue reference parameters. Default is false.
+
+##### `IgnoreNonDeducedTemplateTypes`
+
+If set to true, the check ignores non-deduced template type rvalue reference parameters. Default is false.
+
+```c++
+template <class T>
+struct SomeClass {
+  // Below, 'T' is not deduced and 'T&&' is an rvalue reference type.
+  // This will be flagged if and only if IgnoreNonDeducedTemplateTypes is
+  // false. One suggested fix would be to specialize the class for 'T' and
+  // 'T&' separately (e.g., see std::future), or allow only one of 'T' or
+  // 'T&' instantiations of SomeClass (e.g., see std::optional).
+  SomeClass(T&& t) { }
+};
+
+// Never flagged, since 'T' is a forwarding reference in a deduced context
+template <class T>
+void forwarding_ref(T&& t) {
+  T other = std::forward<T>(t);
+}
+```
+
+This check implements [F.18](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#f18-for-will-move-from-parameters-pass-by-x-and-stdmove-the-parameter) from the C++ Core Guidelines.
+
+### cppcoreguidelines-slicing
+
+Flags slicing of member variables or vtable. Slicing happens when copying a derived object into a base object: the members of the derived object (both member variables and virtual member functions) will be discarded. This can be misleading especially for member function slicing, for example:
+
+```
+struct B { int a; virtual int f(); };
+struct D : B { int b; int f() override; };
+
+void use(B b) {  // Missing reference, intended?
+  b.f();  // Calls B::f.
+}
+
+D d;
+use(d);  // Slice.
+```
+
+This check implements [ES.63](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#es63-dont-slice) and [C.145](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c145-access-polymorphic-objects-through-pointers-and-references) from the C++ Core Guidelines.
+
+### cppcoreguidelines-special-member-functions
+
+The check finds classes where some but not all of the special member functions are defined.
+
+By default the compiler defines a copy constructor, copy assignment operator, move constructor, move assignment operator and destructor. The default can be suppressed by explicit user-definitions. The relationship between which functions will be suppressed by definitions of other functions is complicated and it is advised that all five are defaulted or explicitly defined.
+
+Note that defining a function with `= delete` is considered to be a definition.
+
+This check implements [C.21](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-five) from the C++ Core Guidelines.
+
+#### Options
+
+##### `AllowSoleDefaultDtor`
+
+When set to true (default is false), this check will only trigger on destructors if they are defined and not defaulted.
+
+```c++
+struct A { // This is fine.
+  virtual ~A() = default;
+};
+
+struct B { // This is not fine.
+  ~B() {}
+};
+
+struct C {
+  // This is not checked, because the destructor might be defaulted in
+  // another translation unit.
+  ~C();
+};
+```
+
+##### `AllowMissingMoveFunctions`
+
+When set to true (default is false), this check doesn’t flag classes which define no move operations at all. It still flags classes which define only one of either move constructor or move assignment operator. With this option enabled, the following class won’t be flagged:
+
+```c++
+struct A {
+  A(const A&);
+  A& operator=(const A&);
+  ~A();
+};
+```
+
+##### `AllowMissingMoveFunctionsWhenCopyIsDeleted`
+
+When set to true (default is false), this check doesn’t flag classes which define deleted copy operations but don’t define move operations. This flag is related to Google C++ Style Guide https://google.github.io/styleguide/cppguide.html#Copyable_Movable_Types. With this option enabled, the following class won’t be flagged:
+
+```c++
+struct A {
+  A(const A&) = delete;
+  A& operator=(const A&) = delete;
+  ~A();
+};
+```
+
+### cppcoreguidelines-virtual-class-destructor
+
+Finds virtual classes whose destructor is neither public and virtual nor protected and non-virtual. A virtual class’s destructor should be specified in one of these ways to prevent undefined behavior.
+
+This check implements [C.35](http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-dtor-virtual) from the C++ Core Guidelines.
+
+Note that this check will diagnose a class with a virtual method regardless of whether the class is used as a base class or not.
+
+Fixes are available for user-declared and implicit destructors that are either public and non-virtual or protected and virtual. No fixes are offered for private destructors. There, the decision whether to make them private and virtual or protected and non-virtual depends on the use case and is thus left to the user.
+
+#### Example
+
+For example, the following classes/structs get flagged by the check since they violate guideline **C.35**:
+
+```
+struct Foo {        // NOK, protected destructor should not be virtual
+  virtual void f();
+protected:
+  virtual ~Foo(){}
+};
+
+class Bar {         // NOK, public destructor should be virtual
+  virtual void f();
+public:
+  ~Bar(){}
+};
+```
+
+This would be rewritten to look like this:
+
+```c++
+// OK, destructor is not virtual anymore
+struct Foo {
+  virtual void f();
+protected:
+  ~Foo(){}
+};
+
+// OK, destructor is now virtual
+class Bar {
+  virtual void f();
+public:
+  virtual ~Bar(){}
+};
+```
 
 ## fuchsia-*
 
