@@ -339,9 +339,577 @@ Note: Converting to an integer and back to an `absl::Duration` might be a trunca
 
 Checks related to Boost library.
 
+### boost-use-to-string
+
+This check finds conversion from integer type like int to `std::string` or `std::wstring` using `boost::lexical_cast`, and replace it with calls to `std::to_string` and `std::to_wstring`.
+
+>该检查查找使用`boost::lexical_cast`从整数类型（如`int`）到`std::string`或`std::wstring`的转换，并将其替换为对`std::to_string`和`std::to_wstring`的调用。
+
+It doesn’t replace conversion from floating points despite the `to_string` overloads, because it would change the behavior.
+
+>尽管`to_string`重载，但它不会替换从浮点数的转换，因为它会改变行为。
+
+```c++
+auto str  = boost::lexical_cast<std::string>(42);
+auto wstr = boost::lexical_cast<std::wstring>(2137LL);
+
+// Will be changed to
+auto str  = std::to_string(42);
+auto wstr = std::to_wstring(2137LL);
+```
+
 ## bugprone-*
 
 Checks that target bug-prone code constructs.
+
+### bugprone-argument-comment
+
+Checks that argument comments match parameter names.
+
+>检查实参注释是否与形参名称匹配。
+
+The check understands argument comments in the form `/*parameter_name=*/` that are placed right before the argument.
+
+>该检查理解以`/*parameter_name=*/`形式放置在参数前面的参数注释。
+
+```c++
+void f(bool foo);
+
+...
+
+f(/*bar=*/true);
+// warning: argument name 'bar' in comment does not match parameter name 'foo'
+```
+
+The check tries to detect typos and suggest automated fixes for them.
+
+#### Options
+
+##### `StrictMode`
+
+When `false` (default value), the check will ignore leading and trailing underscores and case when comparing names – otherwise they are taken into account.
+
+>当为`false`（默认值）时，检查将在比较名称时忽略前导和尾随的下划线和大小写，否则将考虑它们。
+
+##### `IgnoreSingleArgument`
+
+When `true`, the check will ignore the single argument.
+
+##### `CommentBoolLiterals`
+
+When `true`, the check will add argument comments in the format `/*ParameterName=*/` right before the boolean literal argument.
+
+Before:
+
+```c++
+void foo(bool TurnKey, bool PressButton);
+foo(true, false);
+```
+
+After:
+
+```c++
+void foo(bool TurnKey, bool PressButton);
+foo(/*TurnKey=*/true, /*PressButton=*/false);
+```
+
+##### `CommentIntegerLiterals`
+
+When true, the check will add argument comments in the format `/*ParameterName=*/` right before the integer literal argument.
+
+Before:
+
+```c++
+void foo(int MeaningOfLife);
+foo(42);
+```
+
+After:
+
+```c++
+void foo(float Pi);
+foo(/*Pi=*/3.14159);
+```
+
+##### `CommentStringLiterals`
+
+When true, the check will add argument comments in the format `/*ParameterName=*/` right before the string literal argument.
+
+Before:
+
+```c++
+void foo(const char *String);
+void foo(const wchar_t *WideString);
+
+foo("Hello World");
+foo(L"Hello World");
+```
+
+After:
+
+```c++
+void foo(const char *String);
+void foo(const wchar_t *WideString);
+
+foo(/*String=*/"Hello World");
+foo(/*WideString=*/L"Hello World");
+```
+
+##### `CommentCharacterLiterals`
+
+When true, the check will add argument comments in the format /*ParameterName=*/ right before the character literal argument.
+
+Before:
+
+```c++
+void foo(char *Character);
+foo('A');
+```
+
+After:
+
+```c++
+void foo(char *Character);
+foo(/*Character=*/'A');
+```
+
+##### `CommentUserDefinedLiterals`
+
+When true, the check will add argument comments in the format /*ParameterName=*/ right before the user defined literal argument.
+
+Before:
+
+```c++
+void foo(double Distance);
+double operator"" _km(long double);
+foo(402.0_km);
+```
+
+After:
+
+```c++
+void foo(double Distance);
+double operator"" _km(long double);
+foo(/*Distance=*/402.0_km);
+```
+
+##### `CommentNullPtrs`
+
+When true, the check will add argument comments in the format /*ParameterName=*/ right before the nullptr literal argument.
+
+Before:
+
+```c++
+void foo(A* Value);
+foo(nullptr);
+```
+
+After:
+
+```c++
+void foo(A* Value);
+foo(/*Value=*/nullptr);
+```
+
+### bugprone-assert-side-effect
+
+Finds `assert()` with side effect.
+
+The condition of `assert()` is evaluated only in debug builds so a condition with side effect can cause different behavior in debug / release builds.
+
+>`assert()`的条件仅在调试版本中评估，因此具有副作用的条件可能在调试/发布版本中导致不同的行为。
+
+#### Options
+
+##### `AssertMacros`
+
+A comma-separated list of the names of assert macros to be checked.
+
+>要检查的断言宏的名称的逗号分隔列表。
+
+##### `CheckFunctionCalls`
+
+Whether to treat non-`const` member and non-member functions as they produce side effects. Disabled by default because it can increase the number of false positive warnings.
+
+>是否对产生副作用的非`const`成员和非成员函数进行处理。
+>
+>默认情况下禁用，因为它会增加误报警告的数量。
+
+##### `IgnoredFunctions`
+
+A semicolon-separated list of the names of functions or methods to be considered as not having side-effects. Regular expressions are accepted, e.g. `[Rr]ef(erence)?$` matches every type with suffix `Ref`, `ref`, Reference and reference. The default is empty. If a name in the list contains the sequence `::` it is matched against the qualified typename (i.e. `namespace::Type`, otherwise it is matched against only the type name (i.e. `Type`).
+
+### bugprone-assignment-in-if-condition
+
+Finds assignments within conditions of `if` statements. Such assignments are bug-prone because they may have been intended as equality tests.
+
+>在`if`语句的条件中查找赋值。这样的赋值很容易出现bug，因为它们可能被用作相等性测试。
+
+This check finds all assignments within if conditions, including ones that are not flagged by `-Wparentheses` due to an extra set of parentheses, and including assignments that call an overloaded operator=().
+
+>该检查查找`if`条件中的所有赋值，包括那些由于额外的圆括号而没有被`-Wparentheses`标记的赋值，以及调用重载操作符`=()`的赋值。
+>
+
+The identified assignments violate [BARR group “Rule 8.2.c”](https://barrgroup.com/embedded-systems/books/embedded-c-coding-standard/statement-rules/if-else-statements).
+
+>被标记的赋值违反BARR组规则8.2。
+
+```c++
+int f = 3;
+
+// This is identified by both `Wparentheses` and this check - should it have been: `if (f == 4)` ?
+if(f = 4) {
+  f = f + 1;
+}
+
+// the assignment here `(f = 6)` is identified by this check, but not by `-Wparentheses`.
+// Should it have been `(f == 6)` ?
+if((f == 5) || (f = 6)) {
+  f = f + 2;
+}
+```
+
+### bugprone-bad-signal-to-kill-thread
+
+Finds `pthread_kill` function calls when a thread is terminated by raising `SIGTERM` signal and the signal kills the entire process, not just the individual thread. Use any signal except `SIGTERM`.
+
+>发现`pthread_kill`函数调用时，一个线程被终止引发`SIGTERM`信号，信号杀死整个进程，而不仅仅是单个线程。
+>
+>使用除`SIGTERM`以外的任何信号。
+
+```c++
+pthread_kill(thread, SIGTERM);
+```
+
+This check corresponds to the CERT C Coding Standard rule [POS44-C. Do not use signals to terminate threads](https://wiki.sei.cmu.edu/confluence/display/c/POS44-C.+Do+not+use+signals+to+terminate+threads).
+
+### bugprone-bool-pointer-implicit-conversion
+
+Checks for conditions based on implicit conversion from a `bool` pointer to `bool`.
+
+>根据从`bool`指针到`bool`指针的隐式转换检查条件。
+
+Example:
+
+```c++
+bool *p;
+if (p) {
+  // Never used in a pointer-specific way.
+}
+```
+
+### bugprone-branch-clone
+
+Checks for repeated branches in if/else if/else chains, consecutive repeated branches in switch statements and identical true and false branches in conditional operators.
+
+>检查if/else if/else链中的重复分支、`switch`语句中的连续重复分支以及条件操作符中的相同`true`和`false`分支。
+
+```c++
+if (test_value(x)) {
+  y++;
+  do_something(x, y);
+} else {
+  y++;
+  do_something(x, y);
+}
+```
+
+In this simple example (which could arise e.g. as a copy-paste error) the `then` and `else` branches are identical and the code is equivalent the following shorter and cleaner code:
+
+>在这个简单的例子中（例如，可能出现复制粘贴错误），`then`和`else`分支是相同的，代码相当于以下更短更清晰的代码。
+
+```c++
+test_value(x); // can be omitted unless it has side effects
+y++;
+do_something(x, y);
+```
+
+If this is the intended behavior, then there is no reason to use a conditional statement; otherwise the issue can be solved by fixing the branch that is handled incorrectly.
+
+>如果这是预期的行为，那么就没有理由使用条件语句;否则，可以通过修复处理不正确的分支来解决问题。
+
+The check also detects repeated branches in longer `if/else if/else` chains where it would be even harder to notice the problem.
+
+>检查还检测到在较长的“if/else if/else”链中重复的分支，在这些链中更难注意到问题。
+
+In `switch` statements the check only reports repeated branches when they are consecutive, because it is relatively common that the `case:` labels have some natural ordering and rearranging them would decrease the readability of the code.
+
+>在`switch`语句中，检查只报告连续的重复分支，因为`case:`标签通常有一些自然的顺序，重新排列它们会降低代码的可读性。
+
+For example:
+
+```c++
+switch (ch) {
+case 'a':
+  return 10;
+case 'A':
+  return 10;
+case 'b':
+  return 11;
+case 'B':
+  return 11;
+default:
+  return 10;
+}
+```
+
+Here the check reports that the `'a'` and `'A'` branches are identical (and that the `'b'` and `'B'` branches are also identical), but does not report that the `default:` branch is also identical to the first two branches. If this is indeed the correct behavior, then it could be implemented as:
+
+>这里，检查报告`a`和`A`分支是相同的（`b`和`B`分支也是相同的），但不报告`default:`分支也与前两个分支相同。
+>
+>如果这确实是正确的行为，那么它可以实现为：
+
+```c++
+switch (ch) {
+case 'a':
+case 'A':
+  return 10;
+case 'b':
+case 'B':
+  return 11;
+default:
+  return 10;
+}
+```
+
+Here the check does not warn for the repeated `return 10;`, which is good if we want to preserve that `'a'` is before `'b'` and `default:` is the last branch.
+
+>这里的检查不会对重复的`return 10;`发出警告，如果我们想保留`a`在`b`之前并且`default:`是最后一个分支，这是很好的。
+
+Switch cases marked with the `[[fallthrough]]` attribute are ignored.
+
+Finally, the check also examines conditional operators and reports code like:
+
+```c++
+return test_value(x) ? x : x;
+```
+
+Unlike `if` statements, the check does not detect chains of conditional operators.
+
+>与`if`语句不同，该检查不检测条件操作符链。
+
+Note: This check also reports situations where branches become identical only after preprocessing.
+
+>注意：此检查还报告只有在预处理之后分支才变得相同的情况。
+
+### bugprone-casting-through-void
+
+Detects unsafe or redundant two-step casting operations involving `void*`.
+
+>检测涉及`void*`的不安全或冗余的两步强制转换操作。
+
+Two-step type conversions via `void*` are discouraged for several reasons.
+
+>由于几个原因，不鼓励通过`void*`进行两步类型转换。
+
+- They obscure code and impede its understandability, complicating maintenance.
+
+  - >它们模糊了代码，阻碍了代码的可理解性，使维护变得复杂。
+
+- These conversions bypass valuable compiler support, erasing warnings related to pointer alignment. It may violate strict aliasing rule and leading to undefined behavior.
+
+  - >这些转换绕过了有价值的编译器支持，消除了与指针对齐相关的警告。
+    >
+    >它可能违反严格的混叠规则并导致未定义的行为。
+
+- In scenarios involving multiple inheritance, ambiguity and unexpected outcomes can arise due to the loss of type information, posing runtime issues.
+
+  - >在涉及多重继承的场景中，由于类型信息的丢失，可能会产生歧义和意外结果，从而引发运行时问题。
+
+In summary, avoiding two-step type conversions through `void*` ensures clearer code, maintains essential compiler warnings, and prevents ambiguity and potential runtime errors, particularly in complex inheritance scenarios.
+
+>总之，通过`void*`避免两步类型转换可以确保代码更清晰，保持必要的编译器警告，并防止歧义和潜在的运行时错误，特别是在复杂的继承场景中。
+
+Examples:
+
+```c++
+using IntegerPointer = int *;
+double *ptr;
+
+static_cast<IntegerPointer>(static_cast<void *>(ptr)); // WRONG
+reinterpret_cast<IntegerPointer>(reinterpret_cast<void *>(ptr)); // WRONG
+(IntegerPointer)(void *)ptr; // WRONG
+IntegerPointer(static_cast<void *>(ptr)); // WRONG
+```
+
+### bugprone-compare-pointer-to-member-virtual-function
+
+Detects unspecified behavior about equality comparison between pointer to member virtual function and anything other than null-pointer-constant.
+
+>检测关于成员虚函数指针与非空指针常量之间相等比较的未指定行为。
+
+```c++
+struct A {
+  void f1();
+  void f2();
+  virtual void f3();
+  virtual void f4();
+
+  void g1(int);
+};
+
+void fn() {
+  bool r1 = (&A::f1 == &A::f2);  // ok
+  bool r2 = (&A::f1 == &A::f3);  // bugprone
+  bool r3 = (&A::f1 != &A::f3);  // bugprone
+  bool r4 = (&A::f3 == nullptr); // ok
+  bool r5 = (&A::f3 == &A::f4);  // bugprone
+
+  void (A::*v1)() = &A::f3;
+  bool r6 = (v1 == &A::f1); // bugprone
+  bool r6 = (v1 == nullptr); // ok
+
+  void (A::*v2)() = &A::f2;
+  bool r7 = (v2 == &A::f1); // false positive, but potential risk if assigning other value to v2.
+
+  void (A::*v3)(int) = &A::g1;
+  bool r8 = (v3 == &A::g1); // ok, no virtual function match void(A::*)(int) signature.
+}
+```
+
+Provide warnings on equality comparisons involve pointers to member virtual function or variables which is potential pointer to member virtual function and any entity other than a null-pointer constant.
+
+>对相等比较提供警告，包括指向成员虚函数的指针或可能指向成员虚函数和除空指针常量以外的任何实体的变量的指针。
+
+In certain compilers, virtual function addresses are not conventional pointers but instead consist of offsets and indexes within a virtual function table (vtable). Consequently, these pointers may vary between base and derived classes, leading to unpredictable behavior when compared directly. This issue becomes particularly challenging when dealing with pointers to pure virtual functions, as they may not even have a valid address, further complicating comparisons.
+
+>在某些编译器中，虚函数地址不是传统的指针，而是由虚函数表（vtable）中的偏移量和索引组成。
+>
+>因此，这些指针可能在基类和派生类之间变化，直接比较时会导致不可预测的行为。
+>
+>当处理指向纯虚函数的指针时，这个问题变得特别具有挑战性，因为它们甚至可能没有有效地址，从而使比较进一步复杂化。
+
+Instead, it is recommended to utilize the `typeid` operator or other appropriate mechanisms for comparing objects to ensure robust and predictable behavior in your codebase. By heeding this detection and adopting a more reliable comparison method, you can mitigate potential issues related to unspecified behavior, especially when dealing with pointers to member virtual functions or pure virtual functions, thereby improving the overall stability and maintainability of your code. In scenarios involving pointers to member virtual functions, it’s only advisable to employ `nullptr` for comparisons.
+
+>相反，建议使用`typeid`操作符或其他适当的机制来比较对象，以确保代码库中的健壮和可预测的行为。通过注意这种检测并采用更可靠的比较方法，您可以减轻与未指定行为相关的潜在问题，特别是在处理指向成员虚函数或纯虚函数的指针时，从而提高代码的整体稳定性和可维护性。在涉及指向成员虚函数的指针的场景中，只建议使用`nullptr`进行比较。
+
+#### Limitations
+
+Does not analyze values stored in a variable. For variable, only analyze all virtual methods in the same `class` or `struct` and diagnose when assigning a pointer to member virtual function to this variable is possible.
+
+>不分析存储在变量中的值。
+>
+>对于变量，只分析同一类或结构中的所有虚方法，并诊断何时可以将指向成员虚函数的指针赋值给该变量。
+
+### bugprone-copy-constructor-init
+
+Finds copy constructors where the constructor doesn’t call the copy constructor of the base class.
+
+>查找构造函数未调用基类的复制构造函数的复制构造函数。
+
+```c++
+class Copyable {
+public:
+  Copyable() = default;
+  Copyable(const Copyable &) = default;
+
+  int memberToBeCopied = 0;
+};
+
+class X2 : public Copyable {
+  X2(const X2 &other) {} // Copyable(other) is missing
+};
+```
+
+Also finds copy constructors where the constructor of the base class don’t have parameter.
+
+>还查找基类的构造函数没有参数的复制构造函数。
+
+```c++
+class X3 : public Copyable {
+  X3(const X3 &other) : Copyable() {} // other is missing
+};
+```
+
+Failure to properly initialize base class sub-objects during copy construction can result in undefined behavior, crashes, data corruption, or other unexpected outcomes. The check ensures that the copy constructor of a derived class properly calls the copy constructor of the base class, helping to prevent bugs and improve code quality.
+
+>在复制构造过程中未能正确初始化基类子对象可能导致未定义的行为、崩溃、数据损坏或其他意想不到的结果。
+>
+>检查确保派生类的复制构造函数正确调用基类的复制构造函数，有助于防止错误并提高代码质量。
+
+Limitations:
+
+- It won’t generate warnings for empty classes, as there are no class members (including base class sub-objects) to worry about.
+
+  - >它不会为空类生成警告，因为没有需要担心的类成员（包括基类子对象）。
+
+- It won’t generate warnings for base classes that have copy constructor private or deleted.
+
+  - >它不会为复制构造函数为私有或已删除的基类生成警告。
+
+- It won’t generate warnings for base classes that are initialized using other non-default constructor, as this could be intentional.
+
+  - 它不会为使用其他非默认构造函数初始化的基类生成警告，因为这可能是故意的。
+
+The check also suggests a fix-its in some cases.
+
+>在某些情况下，检查还建议进行修复。
+
+### bugprone-dangling-handle
+
+Detect dangling references in value handles like `std::string_view`. These dangling references can be a result of constructing handles from temporary values, where the temporary is destroyed soon after the handle is created.
+
+>检测值句柄中的悬空引用，如`std::string_view`。
+>
+>这些悬空引用可能是由临时值构造句柄的结果，其中临时句柄在创建后很快被销毁。
+
+Examples:
+
+```c++
+string_view View = string();  // View will dangle.
+string A;
+View = A + "A";  // still dangle.
+
+vector<string_view> V;
+V.push_back(string());  // V[0] is dangling.
+V.resize(3, string());  // V[1] and V[2] will also dangle.
+
+string_view f() {
+  // All these return values will dangle.
+  return string();
+  string S;
+  return S;
+  char Array[10]{};
+  return Array;
+}
+```
+
+#### Options
+
+##### `HandleClasses`
+
+A semicolon-separated list of class names that should be treated as handles. By default only `std::basic_string_view` and `std::experimental::basic_string_view` are considered.
+
+>应被视为句柄的类名的分号分隔列表。
+>
+>默认情况下，只考虑`std::basic_string_view`和`std::experimental::basic_string_view`。
+
+### bugprone-dynamic-static-initializers
+
+Finds instances of static variables that are dynamically initialized in header files.
+
+>查找在头文件中动态初始化的静态变量的实例。
+
+This can pose problems in certain multithreaded contexts. For example, when disabling compiler generated synchronization instructions for static variables initialized at runtime (e.g. by `-fno-threadsafe-statics`), even if a particular project takes the necessary precautions to prevent race conditions during initialization by providing their own synchronization, header files included from other projects may not. Therefore, such a check is helpful for ensuring that disabling compiler generated synchronization for static variable initialization will not cause problems.
+
+>这可能会在某些多线程上下文中造成问题。
+>
+>例如，当禁用编译器为在运行时初始化的静态变量生成的同步指令时（例如，通过`-fno-threadsafe- stats`），即使特定项目在初始化期间采取必要的预防措施，通过提供自己的同步来防止竞争条件，包括来自其他项目的头文件也可能不会。
+>
+>因此，这样的检查有助于确保禁用编译器为静态变量初始化生成的同步不会导致问题。
+
+Consider the following code:
+
+```c++
+int foo() {
+  static int k = bar();
+  return k;
+}
+```
+
+When synchronization of static initialization is disabled, if two threads both call `foo` for the first time, there is the possibility that k will be double initialized, creating a race condition.
+
+>当静态初始化的同步被禁用时，如果两个线程都是第一次调用`foo`，那么k就有可能被双初始化，从而创建一个竞争条件。
 
 ### bugprone-easily-swappable-parameters
 
@@ -507,6 +1075,114 @@ void strs(String Str, StringView SV) { /* ... */ }
 void cStr(StringView SV, const char *Buf() { /* ... */ }
 ```
 
+### bugprone-empty-catch
+
+Detects and suggests addressing issues with empty `catch` statements.
+
+>检测并建议使用空`catch`语句解决问题。
+
+```c++
+try {
+  // Some code that can throw an exception
+} catch(const std::exception&) {
+}
+```
+
+Having empty catch statements in a codebase can be a serious problem that developers should be aware of. Catch statements are used to handle exceptions that are thrown during program execution. When an exception is thrown, the program jumps to the nearest catch statement that matches the type of the exception.
+
+>在代码库中使用空`catch`语句可能是开发人员应该注意的一个严重问题。
+>
+>`catch`语句用于处理程序执行期间抛出的异常。当抛出异常时，程序跳转到与异常类型匹配的最近的`catch`语句。
+
+Empty catch statements, also known as “swallowing” exceptions, catch the exception but do nothing with it. This means that the exception is not handled properly, and the program continues to run as if nothing happened.
+
+>空`catch`语句，也称为“吞下”异常，捕获异常但不处理异常。
+>
+>这意味着异常没有得到正确处理，程序继续运行，就好像什么都没发生一样。
+
+This can lead to several issues, such as:
+
+- Hidden Bugs: If an exception is caught and ignored, it can lead to hidden bugs that are difficult to diagnose and fix. The root cause of the problem may not be apparent, and the program may continue to behave in unexpected ways.
+- Security Issues: Ignoring exceptions can lead to security issues, such as buffer overflows or null pointer dereferences. Hackers can exploit these vulnerabilities to gain access to sensitive data or execute malicious code.
+- Poor Code Quality: Empty catch statements can indicate poor code quality and a lack of attention to detail. This can make the codebase difficult to maintain and update, leading to longer development cycles and increased costs.
+- Unreliable Code: Code that ignores exceptions is often unreliable and can lead to unpredictable behavior. This can cause frustration for users and erode trust in the software.
+
+To avoid these issues, developers should always handle exceptions properly. This means either fixing the underlying issue that caused the exception or propagating the exception up the call stack to a higher-level handler. If an exception is not important, it should still be logged or reported in some way so that it can be tracked and addressed later.
+
+If the exception is something that can be handled locally, then it should be handled within the catch block. This could involve logging the exception or taking other appropriate action to ensure that the exception is not ignored.
+
+Here is an example:
+
+```c++
+try {
+  // Some code that can throw an exception
+} catch (const std::exception& ex) {
+  // Properly handle the exception, e.g.:
+  std::cerr << "Exception caught: " << ex.what() << std::endl;
+}
+```
+
+If the exception cannot be handled locally and needs to be propagated up the call stack, it should be re-thrown or new exception should be thrown.
+
+Here is an example:
+
+```c++
+try {
+  // Some code that can throw an exception
+} catch (const std::exception& ex) {
+  // Re-throw the exception
+  throw;
+}
+```
+
+In some cases, catching the exception at this level may not be necessary, and it may be appropriate to let the exception propagate up the call stack. This can be done simply by not using `try/catch` block.
+
+Here is an example:
+
+```c++
+void function() {
+  // Some code that can throw an exception
+}
+
+void callerFunction() {
+  try {
+    function();
+  } catch (const std::exception& ex) {
+    // Handling exception on higher level
+    std::cerr << "Exception caught: " << ex.what() << std::endl;
+  }
+}
+```
+
+Other potential solution to avoid empty catch statements is to modify the code to avoid throwing the exception in the first place. This can be achieved by using a different API, checking for error conditions beforehand, or handling errors in a different way that does not involve exceptions. By eliminating the need for try-catch blocks, the code becomes simpler and less error-prone.
+
+Here is an example:
+
+```c++
+// Old code:
+try {
+  mapContainer["Key"].callFunction();
+} catch(const std::out_of_range&) {
+}
+
+// New code
+if (auto it = mapContainer.find("Key"); it != mapContainer.end()) {
+  it->second.callFunction();
+}
+```
+
+In conclusion, empty catch statements are a bad practice that can lead to hidden bugs, security issues, poor code quality, and unreliable code. By handling exceptions properly, developers can ensure that their code is robust, secure, and maintainable.
+
+#### Options
+
+##### `IgnoreCatchWithKeywords`
+
+This option can be used to ignore specific catch statements containing certain keywords. If a `catch` statement body contains (case-insensitive) any of the keywords listed in this semicolon-separated option, then the catch will be ignored, and no warning will be raised. Default value: @TODO;@FIXME.
+
+##### `AllowEmptyCatchForExceptions`
+
+This option can be used to ignore empty catch statements for specific exception types. By default, the check will raise a warning if an empty catch statement is detected, regardless of the type of exception being caught. However, in certain situations, such as when a developer wants to intentionally ignore certain exceptions or handle them in a different way, it may be desirable to allow empty catch statements for specific exception types. To configure this option, a semicolon-separated list of exception type names should be provided. If an exception type name in the list is caught in an empty catch statement, no warning will be raised. Default value: empty string.
+
 ### bugprone-exception-escape
 
 Finds functions which may throw an exception directly or indirectly, but they should not.
@@ -560,6 +1236,552 @@ WARNING! This check may be expensive on large source files.
   - >包含类型名的逗号分隔列表，这些类型名在检查中不被视为抛出异常。
     >
     >默认值为空字符串。
+
+### bugprone-fold-init-type
+
+The check flags type mismatches in [folds](https://en.wikipedia.org/wiki/Fold_(higher-order_function)) like `std::accumulate` that might result in loss of precision. `std::accumulate` folds an input range into an initial value using the type of the latter, with `operator+` by default.
+
+This can cause loss of precision through:
+
+Truncation: The following code uses a floating point range and an int initial value, so truncation will happen at every application of `operator+` and the result will be 0, which might not be what the user expected.
+
+```c++
+auto a = {0.5f, 0.5f, 0.5f, 0.5f};
+return std::accumulate(std::begin(a), std::end(a), 0);
+```
+
+Overflow: The following code also returns `0`.
+
+```c++
+auto a = {65536LL * 65536 * 65536};
+return std::accumulate(std::begin(a), std::end(a), 0);
+```
+
+### bugprone-forward-declaration-namespace
+
+Checks if an unused forward declaration is in a wrong namespace.
+
+The check inspects all unused forward declarations and checks if there is any declaration/definition with the same name existing, which could indicate that the forward declaration is in a potentially wrong namespace.
+
+```c++
+namespace na { struct A; }
+namespace nb { struct A {}; }
+nb::A a;
+// warning : no definition found for 'A', but a definition with the same name
+// 'A' found in another namespace 'nb::'
+```
+
+This check can only generate warnings, but it can’t suggest a fix at this point.
+
+### bugprone-forwarding-reference-overload
+
+The check looks for perfect forwarding constructors that can hide copy or move constructors. If a non const lvalue reference is passed to the constructor, the forwarding reference parameter will be a better match than the const reference parameter of the copy constructor, so the perfect forwarding constructor will be called, which can be confusing. For detailed description of this issue see: Scott Meyers, Effective Modern C++, Item 26.
+
+Consider the following example:
+
+```c++
+class Person {
+public:
+  // C1: perfect forwarding ctor
+  template<typename T>
+  explicit Person(T&& n) {}
+
+  // C2: perfect forwarding ctor with parameter default value
+  template<typename T>
+  explicit Person(T&& n, int x = 1) {}
+
+  // C3: perfect forwarding ctor guarded with enable_if
+  template<typename T, typename X = enable_if_t<is_special<T>, void>>
+  explicit Person(T&& n) {}
+
+  // C4: variadic perfect forwarding ctor guarded with enable_if
+  template<typename... A,
+    enable_if_t<is_constructible_v<tuple<string, int>, A&&...>, int> = 0>
+  explicit Person(A&&... a) {}
+
+  // C5: perfect forwarding ctor guarded with requires expression
+  template<typename T>
+  requires requires { is_special<T>; }
+  explicit Person(T&& n) {}
+
+  // C6: perfect forwarding ctor guarded with concept requirement
+  template<Special T>
+  explicit Person(T&& n) {}
+
+  // (possibly compiler generated) copy ctor
+  Person(const Person& rhs);
+};
+```
+
+The check warns for constructors C1 and C2, because those can hide copy and move constructors. We suppress warnings if the copy and the move constructors are both disabled (deleted or private), because there is nothing the perfect forwarding constructor could hide in this case. We also suppress warnings for constructors like C3-C6 that are guarded with an `enable_if` or a concept, assuming the programmer was aware of the possible hiding.
+
+#### Background
+
+For deciding whether a constructor is guarded with enable_if, we consider the types of the constructor parameters, the default values of template type parameters and the types of non-type template parameters with a default literal value. If any part of these types is `std::enable_if` or `std::enable_if_t`, we assume the constructor is guarded.
+
+### bugprone-implicit-widening-of-multiplication-result
+
+The check diagnoses instances where a result of a multiplication is implicitly widened, and suggests (with fix-it) to either silence the code by making widening explicit, or to perform the multiplication in a wider type, to avoid the widening afterwards.
+
+This is mainly useful when operating on very large buffers.
+
+For example, consider:
+
+```c++
+void zeroinit(char* base, unsigned width, unsigned height) {
+  for(unsigned row = 0; row != height; ++row) {
+    for(unsigned col = 0; col != width; ++col) {
+      char* ptr = base + row * width + col;
+      *ptr = 0;
+    }
+  }
+}
+```
+
+This is fine in general, but if `width * height` overflows, you end up wrapping back to the beginning of `base` instead of processing the entire requested buffer.
+
+Indeed, this only matters for pretty large buffers (4GB+), but that can happen very easily for example in image processing, where for that to happen you “only” need a ~269MPix image.
+
+#### Options
+
+##### `UseCXXStaticCastsInCppSources`
+
+When suggesting fix-its for C++ code, should C++-style `static_cast<>()`’s be suggested, or C-style casts. Defaults to `true`.
+
+##### `UseCXXHeadersInCppSources`
+
+When suggesting to include the appropriate header in C++ code, should `<cstddef>` header be suggested, or `<stddef.h>`. Defaults to `true`.
+
+Examples:
+
+```c++
+long mul(int a, int b) {
+  return a * b; // warning: performing an implicit widening conversion
+    			// to type 'long' of a multiplication performed in type 'int'
+}
+
+char* ptr_add(char *base, int a, int b) {
+  return base + a * b;	// warning: result of multiplication in type 'int' is used as a pointer
+    					// offset after an implicit widening conversion to type 'ssize_t'
+}
+
+char ptr_subscript(char *base, int a, int b) {
+  return base[a * b];	// warning: result of multiplication in type 'int' is used as a pointer
+    					// offset after an implicit widening conversion to type 'ssize_t'
+}
+```
+
+### bugprone-inaccurate-erase
+
+Checks for inaccurate use of the `erase()` method.
+
+Algorithms like `remove()` do not actually remove any element from the container but return an iterator to the first redundant element at the end of the container. These redundant elements must be removed using the `erase()` method. This check warns when not all of the elements will be removed due to using an inappropriate overload.
+
+For example, the following code erases only one element:
+
+```c++
+std::vector<int> xs;
+// ...
+xs.erase(std::remove(xs.begin(), xs.end(), 10));
+```
+
+Call the two-argument overload of `erase()` to remove the subrange:
+
+```c++
+std::vector<int> xs;
+// ...
+xs.erase(std::remove(xs.begin(), xs.end(), 10), xs.end());
+```
+
+### bugprone-inc-dec-in-conditions
+
+Detects when a variable is both incremented/decremented and referenced inside a complex condition and suggests moving them outside to avoid ambiguity in the variable’s value.
+
+When a variable is modified and also used in a complex condition, it can lead to unexpected behavior. The side-effect of changing the variable’s value within the condition can make the code difficult to reason about. Additionally, the developer’s intended timing for the modification of the variable may not be clear, leading to misunderstandings and errors. This can be particularly problematic when the condition involves logical operators like `&&` and `||`, where the order of evaluation can further complicate the situation.
+
+Consider the following example:
+
+```c++
+int i = 0;
+// ...
+if (i++ < 5 && i > 0) {
+  // do something
+}
+```
+
+In this example, the result of the expression may not be what the developer intended. The original intention of the developer could be to increment `i` after the entire condition is evaluated, but in reality, i will be incremented before `i > 0` is executed. This can lead to unexpected behavior and bugs in the code. To fix this issue, the developer should separate the increment operation from the condition and perform it separately.
+
+For example, they can increment `i` in a separate statement before or after the condition is evaluated. This ensures that the value of `i` is predictable and consistent throughout the code.
+
+```c++
+int i = 0;
+// ...
+i++;
+if (i <= 5 && i > 0) {
+  // do something
+}
+```
+
+Another common issue occurs when multiple increments or decrements are performed on the same variable inside a complex condition.
+
+For example:
+
+```c++
+int i = 4;
+// ...
+if (i++ < 5 || --i > 2) {
+  // do something
+}
+```
+
+There is a potential issue with this code due to the order of evaluation in C++. The `||` operator used in the condition statement guarantees that if the first operand evaluates to `true`, the second operand will not be evaluated. This means that if `i` were initially `4`, the first operand `i < 5` would evaluate to `true` and the second operand `i > 2` would not be evaluated. As a result, the decrement operation `--i` would not be executed and `i` would hold value `5`, which may not be the intended behavior for the developer.
+
+To avoid this potential issue, the both increment and decrement operation on `i` should be moved outside the condition statement.
+
+### bugprone-incorrect-enable-if
+
+Detects incorrect usages of `std::enable_if` that don’t name the nested `type` type.
+
+In C++11 introduced `std::enable_if` as a convenient way to leverage SFINAE. One form of using `std::enable_if` is to declare an unnamed template type parameter with a default type equal to `typename std::enable_if<condition>::type`. If the author forgets to name the nested type `type`, then the code will always consider the candidate template even if the condition is not met.
+
+Below are some examples of code using `std::enable_if` correctly and incorrect examples that this check flags.
+
+```c++
+template <
+	typename T,
+	typename = typename std::enable_if<T::some_trait>::type
+        >
+void valid_usage() { ... }
+
+template <
+	typename T,
+	typename = std::enable_if_t<T::some_trait>
+        >
+void valid_usage_with_trait_helpers() { ... }
+
+// The below code is not a correct application of SFINAE. Even if
+// T::some_trait is not true, the function will still be considered in the
+// set of function candidates. It can either incorrectly select the function
+// when it should not be a candidates, and/or lead to hard compile errors
+// if the body of the template does not compile if the condition is not
+// satisfied.
+template <
+	typename T,
+	typename = std::enable_if<T::some_trait>
+        >
+void invalid_usage() { ... }
+
+// The tool suggests the following replacement for 'invalid_usage':
+template <
+	typename T,
+	typename = typename std::enable_if<T::some_trait>::type
+        >
+void fixed_invalid_usage() { ... }
+```
+
+C++14 introduced the trait helper `std::enable_if_t` which reduces the likelihood of this error. C++20 introduces constraints, which generally supersede the use of `std::enable_if`. See [modernize-type-traits](https://clang.llvm.org/extra/clang-tidy/checks/modernize/type-traits.html) for another tool that will replace `std::enable_if` with `std::enable_if_t`, and see [modernize-use-constraints](https://clang.llvm.org/extra/clang-tidy/checks/modernize/use-constraints.html) for another tool that replaces `std::enable_if` with C++20 constraints. Consider these newer mechanisms where possible.
+
+### bugprone-incorrect-roundings
+
+Checks the usage of patterns known to produce incorrect rounding.
+
+Programmers often use:
+
+```c++
+(int)(double_expression + 0.5)
+```
+
+to round the double expression to an integer.
+
+The problem with this:
+
+1. It is unnecessarily slow.
+2. It is incorrect. The number 0.499999975 (smallest representable float number below 0.5) rounds to 1.0.
+   - Even worse behavior for negative numbers where both -0.5f and -1.4f both round to 0.0.
+
+### bugprone-infinite-loop
+
+Finds obvious infinite loops (loops where the condition variable is not changed at all).
+
+Finding infinite loops is well-known to be impossible (halting problem). However, it is possible to detect some obvious infinite loops, for example, if the loop condition is not changed. This check detects such loops. A loop is considered infinite if it does not have any loop exit statement (`break`, `continue`, `goto`, `return`, `throw` or a call to a function called as `[[noreturn]]`) and all of the following conditions hold for every variable in the condition:
+
+- It is a local variable.
+- It has no reference or pointer aliases.
+- It is not a structure or class member.
+
+Furthermore, the condition must not contain a function call to consider the loop infinite since functions may return different values for different calls.
+
+For example, the following loop is considered infinite i is not changed in the body:
+
+```c++
+int i = 0, j = 0;
+while (i < 10) {
+  ++j;
+}
+```
+
+### bugprone-integer-division
+
+Finds cases where integer division in a floating point context is likely to cause unintended loss of precision.
+
+No reports are made if divisions are part of the following expressions:
+
+- operands of operators expecting integral or bool types,
+- call expressions of integral or bool types, and
+- explicit cast expressions to integral or bool types,
+
+as these are interpreted as signs of deliberateness from the programmer.
+
+Examples:
+
+```c++
+float floatFunc(float);
+int intFunc(int);
+double d;
+int i = 42;
+
+// Warn, floating-point values expected.
+d = 32 * 8 / (2 + i);
+d = 8 * floatFunc(1 + 7 / 2);
+d = i / (1 << 4);
+
+// OK, no integer division.
+d = 32 * 8.0 / (2 + i);
+d = 8 * floatFunc(1 + 7.0 / 2);
+d = (double)i / (1 << 4);
+
+// OK, there are signs of deliberateness.
+d = 1 << (i / 2);
+d = 9 + intFunc(6 * i / 32);
+d = (int)(i / 32) - 8;
+```
+
+### bugprone-lambda-function-name
+
+Checks for attempts to get the name of a function from within a lambda expression. The name of a lambda is always something like `operator()`, which is almost never what was intended.
+
+Example:
+
+```c++
+void FancyFunction() {
+  [] { printf("Called from %s\n", __func__); }();
+  [] { printf("Now called from %s\n", __FUNCTION__); }();
+}
+```
+
+Output:
+
+```c++
+Called from operator()
+Now called from operator()
+```
+
+Likely intended output:
+
+```c++
+Called from FancyFunction
+Now called from FancyFunction
+```
+
+#### Options
+
+##### `IgnoreMacros`
+
+The value true specifies that attempting to get the name of a function from within a macro should not be diagnosed.
+
+The default value is `false`.
+
+### bugprone-macro-parentheses
+
+Finds macros that can have unexpected behavior due to missing parentheses.
+
+Macros are expanded by the preprocessor as-is. As a result, there can be unexpected behavior; operators may be evaluated in unexpected order and unary operators may become binary operators, etc.
+
+When the replacement list has an expression, it is recommended to surround it with parentheses. This ensures that the macro result is evaluated completely before it is used.
+
+It is also recommended to surround macro arguments in the replacement list with parentheses. This ensures that the argument value is calculated properly.
+
+### bugprone-macro-repeated-side-effects
+
+Checks for repeated argument with side effects in macros.
+
+### bugprone-misplaced-operator-in-strlen-in-alloc
+
+Finds cases where `1` is added to the string in the argument to `strlen()`, `strnlen()`, `strnlen_s()`, `wcslen()`, `wcsnlen()`, and `wcsnlen_s()` instead of the result and the value is used as an argument to a memory allocation function (`malloc()`, `calloc()`, `realloc()`, `alloca()`) or the `new[]` operator in C++. The check detects error cases even if one of these functions (except the `new[]` operator) is called by a constant function pointer. Cases where `1` is added both to the parameter and the result of the `strlen()`-like function are ignored, as are cases where the whole addition is surrounded by extra parentheses.
+
+C example code:
+
+```c++
+void bad_malloc(char *str) {
+  char *c = (char*) malloc(strlen(str + 1));
+}
+```
+
+The suggested fix is to add `1` to the return value of `strlen()` and not to its argument. In the example above the fix would be
+
+```c++
+char *c = (char*) malloc(strlen(str) + 1);
+```
+
+C++ example code:
+
+```c++
+void bad_new(char *str) {
+  char *c = new char[strlen(str + 1)];
+}
+```
+
+As in the C code with the `malloc()` function, the suggested fix is to add `1` to the return value of `strlen()` and not to its argument.
+
+In the example above the fix would be
+
+```c++
+char *c = new char[strlen(str) + 1];
+```
+
+Example for silencing the diagnostic:
+
+```c++
+void bad_malloc(char *str) {
+  char *c = (char*) malloc(strlen((str + 1)));
+}
+```
+
+### bugprone-misplaced-pointer-arithmetic-in-alloc
+
+Finds cases where an integer expression is added to or subtracted from the result of a memory allocation function (`malloc()`, `calloc()`, `realloc()`, `alloca()`) instead of its argument. The check detects error cases even if one of these functions is called by a constant function pointer.
+
+Example code:
+
+```c++
+void bad_malloc(int n) {
+  char *p = (char*) malloc(n) + 10;
+}
+```
+
+The suggested fix is to add the integer expression to the argument of `malloc` and not to its result. In the example above the fix would be
+
+```c++
+char *p = (char*) malloc(n + 10);
+```
+
+### bugprone-misplaced-widening-cast
+
+This check will warn when there is a cast of a calculation result to a bigger type. If the intention of the cast is to avoid loss of precision then the cast is misplaced, and there can be loss of precision. Otherwise the cast is ineffective.
+
+Example code:
+
+```c++
+long f(int x) {
+    return (long)(x * 1000);
+}
+```
+
+The result `x * 1000` is first calculated using `int` precision. If the result exceeds `int` precision there is loss of precision. Then the result is casted to `long`.
+
+If there is no loss of precision then the cast can be removed or you can explicitly cast to `int` instead.
+
+If you want to avoid loss of precision then put the cast in a proper location, for instance:
+
+```c++
+long f(int x) {
+    return (long)x * 1000;
+}
+```
+
+#### Implicit casts
+
+Forgetting to place the cast at all is at least as dangerous and at least as common as misplacing it.
+
+If [`CheckImplicitCasts`](https://clang.llvm.org/extra/clang-tidy/checks/bugprone/misplaced-widening-cast.html#cmdoption-arg-CheckImplicitCasts) is enabled the check also detects these cases, for instance:
+
+```c++
+long f(int x) {
+    return x * 1000;
+}
+```
+
+#### Floating point
+
+Currently warnings are only written for integer conversion. No warning is written for this code:
+
+```c++
+double f(float x) {
+    return (double)(x * 10.0f);
+}
+```
+
+#### Options
+
+##### `CheckImplicitCasts`
+
+If true, enables detection of implicit casts.
+
+Default is `false`.
+
+### bugprone-move-forwarding-reference
+
+Warns if `std::move` is called on a forwarding reference, for example:
+
+```c++
+template <typename T>
+void foo(T&& t) {
+  bar(std::move(t));
+}
+```
+
+[Forwarding references](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4164.pdf) should typically be passed to `std::forward` instead of `std::move`, and this is the fix that will be suggested.
+
+(A forwarding reference is an rvalue reference of a type that is a deduced function template argument.)
+
+In this example, the suggested fix would be
+
+```c++
+bar(std::forward<T>(t));
+```
+
+#### Background
+
+Code like the example above is sometimes written with the expectation that `T&&` will always end up being an rvalue reference, no matter what type is deduced for `T`, and that it is therefore not possible to pass an lvalue to `foo()`.
+
+However, this is not true. Consider this example:
+
+```c++
+std::string s = "Hello, world";
+foo(s);
+```
+
+This code compiles and, after the call to `foo()`, `s` is left in an indeterminate state because it has been moved from. This may be surprising to the caller of `foo()` because no `std::move` was used when calling `foo()`.
+
+The reason for this behavior lies in the special rule for template argument deduction on function templates like `foo()` – i.e. on function templates that take an rvalue reference argument of a type that is a deduced function template argument. (See section [temp.deduct.call]/3 in the C++11 standard.)
+
+If `foo()` is called on an lvalue (as in the example above), then `T` is deduced to be an lvalue reference. In the example, `T` is deduced to be `std::string &`. The type of the argument `t` therefore becomes `std::string& &&`; by the reference collapsing rules, this collapses to `std::string&`.
+
+This means that the `foo(s)` call passes `s` as an lvalue reference, and `foo()` ends up moving `s` and thereby placing it into an indeterminate state.
+
+### bugprone-multi-level-implicit-pointer-conversion
+
+Detects implicit conversions between pointers of different levels of indirection.
+
+Conversions between pointer types of different levels of indirection can be dangerous and may lead to undefined behavior, particularly if the converted pointer is later cast to a type with a different level of indirection. For example, converting a pointer to a pointer to an `int` (`int**`) to a `void*` can result in the loss of information about the original level of indirection, which can cause problems when attempting to use the converted pointer. If the converted pointer is later cast to a type with a different level of indirection and dereferenced, it may lead to access violations, memory corruption, or other undefined behavior.
+
+Consider the following example:
+
+```c++
+void foo(void* ptr);
+
+int main() {
+  int x = 42;
+  int* ptr = &x;
+  int** ptr_ptr = &ptr;
+  foo(ptr_ptr); // warning will trigger here
+  return 0;
+}
+```
+
+In this example, `foo()` is called with `ptr_ptr` as its argument. However, `ptr_ptr` is a `int**` pointer, while `foo()` expects a `void*` pointer. This results in an implicit pointer level conversion, which could cause issues if `foo()` dereferences the pointer assuming it’s a `int*` pointer.
+
+Using an explicit cast is a recommended solution to prevent issues caused by implicit pointer level conversion, as it allows the developer to explicitly state their intention and show their reasoning for the type conversion. Additionally, it is recommended that developers thoroughly check and verify the safety of the conversion before using an explicit cast. This extra level of caution can help catch potential issues early on in the development process, improving the overall reliability and maintainability of the code.
 
 ## cert-*
 
