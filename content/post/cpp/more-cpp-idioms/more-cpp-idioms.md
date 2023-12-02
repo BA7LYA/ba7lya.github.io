@@ -2,8 +2,8 @@
 title: "More C++ Idioms"
 date: 2023-12-02T21:23:17+08:00
 description: "More C++ Idioms"
-featured: false
-toc: true
+featured: true
+toc: false
 usePageBundles: false
 featureImage: ""
 featureImageAlt: ''
@@ -18,8 +18,6 @@ tags:
   - C++ Idioms
 comment: true
 ---
-
-# More C++ Idioms
 
 More C++ Idioms / Address Of
 
