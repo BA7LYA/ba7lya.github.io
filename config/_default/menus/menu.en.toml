@@ -24,9 +24,19 @@ name = "More C++ Idioms"
 url = "post/cpp/more-cpp-idioms/more-cpp-idioms"
 
 [[main]]
+name = "Algo"
+url = ""
+weight = -108
+
+[[main]]
+name = "Design Pattern"
+url = ""
+weight = -107
+
+[[main]]
 name = "About"
 url = "about/"
-weight = -108
+weight = -106
 
 [[social]]
 name = "github"
