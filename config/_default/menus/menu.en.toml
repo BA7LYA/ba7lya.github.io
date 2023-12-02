@@ -11,12 +11,17 @@ weight = -109
 [[main]]
 parent = "C++"
 name = "Clang-Tidy"
-url = "post/clang-tidy/clang-tidy"
+url = "post/cpp/clang-tidy/clang-tidy"
 
 [[main]]
 parent = "C++"
 name = "C++ Core Guidelines"
-url = "post/cpp-core-guidelines/cpp-core-guidelines"
+url = "post/cpp/cpp-core-guidelines/cpp-core-guidelines"
+
+[[main]]
+parent = "C++"
+name = "More C++ Idioms"
+url = "post/cpp/more-cpp-idioms/more-cpp-idioms"
 
 [[main]]
 name = "About"
