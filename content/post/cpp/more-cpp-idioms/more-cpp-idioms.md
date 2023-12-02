@@ -27,8 +27,6 @@ More C++ Idioms / Algebraic Hierarchy
 
 More C++ Idioms / Attach by Initialization
 
-More C++ Idioms / Authors
-
 More C++ Idioms / Barton-Nackman trick
 
 More C++ Idioms / Base-from-Member
@@ -220,5 +218,3 @@ More C++ Idioms / Type Selection
 More C++ Idioms / Virtual Constructor
 
 More C++ Idioms / Virtual Friend Function
-
-More C++ Idioms / Web Analytics
