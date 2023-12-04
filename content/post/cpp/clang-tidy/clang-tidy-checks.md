@@ -7410,7 +7410,7 @@ In addition, flushing the stream buffer can cause additional overhead when worki
 
 int main(int argc, const char* argv[])
 {
-	const uint64_t times = 1'0000'0000;
+	const uint64_t times = 100'0000;
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 	for (size_t i = 0; i < times; i++)
