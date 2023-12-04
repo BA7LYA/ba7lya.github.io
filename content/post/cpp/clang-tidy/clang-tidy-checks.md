@@ -7391,9 +7391,71 @@ Checks that target performance-related issues.
 
 Checks for uses of `std::endl` on streams and suggests using the newline character `'\n'` instead.
 
-Rationale: Using `std::endl` on streams can be less efficient than using the newline character `'\n'` because `std::endl` performs two operations: it writes a newline character to the output stream and then flushes the stream buffer. Writing a single newline character using `'\n'` does not trigger a flush, which can improve performance. In addition, flushing the stream buffer can cause additional overhead when working with streams that are buffered.
+#### Rationale
 
-Example:
+Using `std::endl` on streams can be less efficient than using the newline character `'\n'` because:
+
+- `std::endl` performs two operations: it writes a newline character to the output stream and then flushes the stream buffer.
+- Writing a single newline character using `'\n'` does not trigger a flush, which can improve performance.
+
+In addition, flushing the stream buffer can cause additional overhead when working with streams that are buffered.
+
+#### Test
+
+```c++
+// demo.cxx
+
+#include <chrono>
+#include <iostream>
+
+int main(int argc, const char* argv[])
+{
+	const uint64_t times = 1'0000'0000;
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+	for (size_t i = 0; i < times; i++)
+	{
+		std::cout << "_" << std::endl;
+	}
+	auto t2 = std::chrono::high_resolution_clock::now();
+
+	auto delta_t1_t2
+		= std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count(
+		);
+
+	auto t3 = std::chrono::high_resolution_clock::now();
+	for (size_t i = 0; i < times; i++)
+	{
+		std::cout << "_" << '\n';
+	}
+	auto t4 = std::chrono::high_resolution_clock::now();
+
+	auto delta_t3_t4
+		= std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count(
+		);
+
+	std::cout << "delta_t1_t2 = " << delta_t1_t2 << "ms" << '\n';
+	std::cout << "delta_t3_t4 = " << delta_t3_t4 << "ms" << '\n';
+
+	return 0;
+}
+```
+
+**Result**
+
+```c++
+//     CPU : Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+//      OS : Windows 11 Pro 23H2 22631.2715
+// Compile : cl /EHsc /O2 /std:c++latest demo.cxx // <== Compiler: VS2022 17.8.2
+delta_t1_t2 = 72110ms
+delta_t3_t4 = 72770ms
+
+// (72770ms - 72110ms) / 72110ms ~= 0.9%
+```
+
+So ..., maybe it's not a big deal.
+
+#### Example
 
 Consider the following code:
 
