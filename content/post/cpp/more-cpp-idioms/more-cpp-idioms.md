@@ -19,7 +19,7 @@ tags:
 comment: true
 ---
 
-More C++ Idioms / Address Of
+[More C++ Idioms / Address Of]({{< ref "more-cpp-idioms-address-of.md" >}})
 
 More C++ Idioms / Algebraic Hierarchy
 
