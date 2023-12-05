@@ -19,6 +19,26 @@ tags:
 comment: true
 ---
 
+## Preface
+
+> C++ has indeed become too "expert friendly"
+>
+>  -- Bjarne Stroustrup, The Problem with Programming, Technology Review, Nov 2006.
+
+Stroustrup's saying is true because experts are intimately familiar with the idioms in the language. With the increase in the idioms a programmer understands, the language becomes friendlier to them. The objective of this open content book is to present modern C++ idioms to programmers who have moderate level of familiarity with C++, and help elevate their knowledge so that C++ feels much friendlier to them. It is designed to be an exhaustive catalog of reusable idioms that expert C++ programmers often use while programming or designing using C++. This is an effort to capture their techniques and vocabulary into a single work. This book describes the idioms in a regular format: Name-Intent-Motivation-Solution-References, which is succinct and helps speed learning. By their nature, idioms tend to have appeared in the C++ community and in published work many times. An effort has been made to refer to the original source(s) where possible; if you find a reference incomplete or incorrect, please feel free to suggest or make improvements.
+
+Stroustrup的说法是正确的，因为专家们非常熟悉语言中的习语。随着程序员理解的习语的增加，语言对他们来说变得更加友好。这本开放内容书的目的是向对C++有一定熟悉程度的程序员介绍现代C++惯用法，并帮助提高他们的知识水平，使C++对他们更友好。它被设计为C++编程专家在使用C++编程或设计时经常使用的可重用成语的详尽目录。这是将他们的技术和词汇融入到一个作品中的努力。这本书以常规的格式描述了习语：名称-意图-动机-解决方案-参考，这是简洁的，有助于加快学习。就其本质而言，惯用法往往在C++社区和已发表的作品中多次出现。在可能的情况下，已尽力参考原始来源，如果您发现参考资料不完整或不正确，请随时提出建议或进行改进。
+
+The world is invited to catalog reusable pieces of C++ knowledge (similar to the book on design patterns by GoF). The goal here is to first build an exhaustive catalog of modern C++ idioms and later evolve it into an idiom language, just like a pattern language. Finally, the contents of this book can be redistributed under the terms of the GNU Free Documentation License.
+
+我们邀请全世界对可重用的C++知识片段进行编目（类似于GoF关于设计模式的书）。这里的目标是首先构建现代C++惯用法的详尽目录，然后将其发展为习惯用法语言，就像模式语言一样。最后，本书的内容可以在GNU自由文档许可证的条款下重新发布。
+
+Aimed toward: Anyone with an intermediate level of knowledge in C++ and supported language paradigms.
+
+目标人群：任何具有中级C++知识和支持的语言范例的人。
+
+## Table of Contents
+
 [More C++ Idioms / Address Of]({{< ref "more-cpp-idioms-address-of.md" >}})
 
 More C++ Idioms / Algebraic Hierarchy
