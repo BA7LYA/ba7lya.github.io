@@ -1524,13 +1524,17 @@ while (i < 10) {
 
 Finds cases where integer division in a floating point context is likely to cause unintended loss of precision.
 
+查找浮点上下文中整数除法可能导致意外精度损失的情况。
+
 No reports are made if divisions are part of the following expressions:
 
-- operands of operators expecting integral or bool types,
-- call expressions of integral or bool types, and
-- explicit cast expressions to integral or bool types,
+- operands of operators expecting integral or bool types, // 操作符的操作数期望整型或布尔类型的；
+- call expressions of integral or bool types, and // 调用整型或布尔类型的表达式；
+- explicit cast expressions to integral or bool types, // 显式将表达式强制转换为整型或bool类型；
 
 as these are interpreted as signs of deliberateness from the programmer.
+
+> 注：有时候检测不出来。
 
 Examples:
 
@@ -3982,6 +3986,200 @@ struct Derived : Base {
 
 Checks related to CERT Secure Coding Guidelines.
 
+### cert-err33-c
+
+Warns on unused function return values. Many of the standard library functions return a value that indicates if the call was successful. Ignoring the returned value can cause unexpected behavior if an error has occurred.
+
+警告未使用的函数返回值。许多标准库函数返回一个值，该值指示调用是否成功。如果发生错误，忽略返回值可能会导致意外行为。
+
+The following functions are checked:
+
+```c++
+aligned_alloc()
+asctime_s()
+at_quick_exit()
+atexit()
+bsearch()
+bsearch_s()
+btowc()
+c16rtomb()
+c32rtomb()
+calloc()
+clock()
+cnd_broadcast()
+cnd_init()
+cnd_signal()
+cnd_timedwait()
+cnd_wait()
+ctime_s()
+fclose()
+fflush()
+fgetc()
+fgetpos()
+fgets()
+fgetwc()
+fopen()
+fopen_s()
+fprintf()
+fprintf_s()
+fputc()
+fputs()
+fputwc()
+fputws()
+fread()
+freopen()
+freopen_s()
+fscanf()
+fscanf_s()
+fseek()
+fsetpos()
+ftell()
+fwprintf()
+fwprintf_s()
+fwrite()
+fwscanf()
+fwscanf_s()
+getc()
+getchar()
+getenv()
+getenv_s()
+gets_s()
+getwc()
+getwchar()
+gmtime()
+gmtime_s()
+localtime()
+localtime_s()
+malloc()
+mbrtoc16()
+mbrtoc32()
+mbsrtowcs()
+mbsrtowcs_s()
+mbstowcs()
+mbstowcs_s()
+memchr()
+mktime()
+mtx_init()
+mtx_lock()
+mtx_timedlock()
+mtx_trylock()
+mtx_unlock()
+printf_s()
+putc()
+putwc()
+raise()
+realloc()
+remove()
+rename()
+setlocale()
+setvbuf()
+scanf()
+scanf_s()
+signal()
+snprintf()
+snprintf_s()
+sprintf()
+sprintf_s()
+sscanf()
+sscanf_s()
+strchr()
+strerror_s()
+strftime()
+strpbrk()
+strrchr()
+strstr()
+strtod()
+strtof()
+strtoimax()
+strtok()
+strtok_s()
+strtol()
+strtold()
+strtoll()
+strtoumax()
+strtoul()
+strtoull()
+strxfrm()
+swprintf()
+swprintf_s()
+swscanf()
+swscanf_s()
+thrd_create()
+thrd_detach()
+thrd_join()
+thrd_sleep()
+time()
+timespec_get()
+tmpfile()
+tmpfile_s()
+tmpnam()
+tmpnam_s()
+tss_create()
+tss_get()
+tss_set()
+ungetc()
+ungetwc()
+vfprintf()
+vfprintf_s()
+vfscanf()
+vfscanf_s()
+vfwprintf()
+vfwprintf_s()
+vfwscanf()
+vfwscanf_s()
+vprintf_s()
+vscanf()
+vscanf_s()
+vsnprintf()
+vsnprintf_s()
+vsprintf()
+vsprintf_s()
+vsscanf()
+vsscanf_s()
+vswprintf()
+vswprintf_s()
+vswscanf()
+vswscanf_s()
+vwprintf_s()
+vwscanf()
+vwscanf_s()
+wcrtomb()
+wcschr()
+wcsftime()
+wcspbrk()
+wcsrchr()
+wcsrtombs()
+wcsrtombs_s()
+wcsstr()
+wcstod()
+wcstof()
+wcstoimax()
+wcstok()
+wcstok_s()
+wcstol()
+wcstold()
+wcstoll()
+wcstombs()
+wcstombs_s()
+wcstoumax()
+wcstoul()
+wcstoull()
+wcsxfrm()
+wctob()
+wctrans()
+wctype()
+wmemchr()
+wprintf_s()
+wscanf()
+wscanf_s()
+```
+
+This check is an alias of check `bugprone-unused-return-value` with a fixed set of functions.
+
+The check corresponds to a part of CERT C Coding Standard rule [ERR33-C. Detect and handle standard library errors](https://wiki.sei.cmu.edu/confluence/display/c/ERR33-C.+Detect+and+handle+standard+library+errors). The list of checked functions is taken from the rule, with following exception:
+
+- The check can not differentiate if a function is called with `NULL` argument. Therefore the following functions are not checked: `mblen`, `mbrlen`, `mbrtowc`, `mbtowc`, `wctomb`, `wctomb_s`.
+
 ## clang-analyzer-*
 
 Clang Static Analyzer checks.
@@ -3992,17 +4190,17 @@ Checks related to concurrent programming (including threads, fibers, coroutines,
 
 ### concurrency-mt-unsafe
 
-Checks for some thread-unsafe functions against a black list of known-to-be-unsafe functions. Usually they access static variables without synchronization (e.g. gmtime(3)) or utilize signals in a racy way. The set of functions to check is specified with the **FunctionSet** option.
+Checks for some thread-unsafe functions against a black list of known-to-be-unsafe functions. Usually they access static variables without synchronization (e.g. `gmtime(3)`) or utilize signals in a racy way. The set of functions to check is specified with the `FunctionSet` option.
 
->根据已知不安全函数的黑名单检查某些线程不安全函数。
->
->通常它们访问静态变量时没有同步（例如`gmtime`(3)），或者以一种活泼的方式利用信号。
->
->要检查的函数集由**FunctionSet**选项指定。
+根据已知不安全函数的黑名单检查某些线程不安全函数。
+
+通常它们访问静态变量时没有同步（例如`gmtime`(3)），或者以一种活泼的方式利用信号。
+
+要检查的函数集由`FunctionSet`选项指定。
 
 Note that using some thread-unsafe functions may be still valid in concurrent programming if only a single thread is used (e.g. setenv(3)), however, some functions may track a state in global variables which would be clobbered by subsequent (non-parallel, but concurrent) calls to a related function.
 
->请注意，如果只使用单个线程（例如`setenv`(3)），在并发编程中使用一些线程不安全的函数可能仍然可以，然而，一些函数可能会跟踪全局变量中的状态，这些状态将被后续（非并行，但并发）调用相关函数所破坏。
+请注意，如果只使用单个线程（例如`setenv`(3)），在并发编程中使用一些线程不安全的函数可能仍然可以，然而，一些函数可能会跟踪全局变量中的状态，这些状态将被后续（非并行，但并发）调用相关函数所破坏。
 
 E.g. the following code suffers from unprotected accesses to a global state:
 
@@ -4021,12 +4219,14 @@ tm = gmtime(timep); // uses a global buffer
 sleep(1); // implementation may use SIGALRM
 ```
 
-**FunctionSet**
+#### Options
+
+##### `FunctionSet`
 
 Specifies which functions in libc should be considered thread-safe, possible values are `posix`, `glibc`, or `any`.
 
 - `posix` means POSIX defined thread-unsafe functions. POSIX.1-2001 in “2.9.1 Thread-Safety” defines that all functions specified in the standard are thread-safe except a predefined list of thread-unsafe functions.
-- `glibc` defines some of them as thread-safe (e.g. dirname(3)), but adds non-POSIX thread-unsafe ones (e.g. getopt_long(3)).
+- `glibc` defines some of them as thread-safe (e.g. `dirname(3)`), but adds non-POSIX thread-unsafe ones (e.g. `getopt_long(3)`).
   - Glibc’s list is compiled from GNU web documentation with a search for MT-Safe tag<sup>[3]</sup>.
 - If you want to identify thread-unsafe API for at least one libc or unsure which libc will be used, use `any` (default).
 
@@ -5217,6 +5417,29 @@ public:
 
 Checks related to Fuchsia coding conventions.
 
+### fuchsia-default-arguments-calls
+
+Warns if a function or method is called with default arguments.
+
+For example, given the declaration:
+
+```c++
+int foo(int value = 5) {
+    return value;
+}
+```
+
+A function call expression that uses a default argument will be diagnosed.
+
+Calling it without defaults will not cause a warning:
+
+```c++
+foo();  // warning
+foo(0); // no warning
+```
+
+See the features disallowed in Fuchsia at https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/cxx?hl=en.
+
 ## google-*
 
 Checks related to Google coding conventions.
@@ -5235,6 +5458,30 @@ Corresponding cpplint.py check: readability/todo
 
 Checks related to High Integrity C++ Coding Standard.
 
+### hicpp-avoid-c-arrays
+
+The hicpp-avoid-c-arrays check is an alias, please see [modernize-avoid-c-arrays](https://releases.llvm.org/17.0.1/tools/clang/tools/extra/docs/clang-tidy/checks/modernize/avoid-c-arrays.html) for more information.
+
+### hicpp-signed-bitwise
+
+Finds uses of bitwise operations on signed integer types, which may lead to undefined or implementation defined behavior.
+
+查找对有符号整数类型的位操作的使用，这可能导致未定义或实现定义的行为。
+
+The according rule is defined in the [High Integrity C++ Standard, Section 5.6.1](http://www.codingstandard.com/section/5-6-shift-operators/).
+
+#### Options
+
+##### `IgnorePositiveIntegerLiterals`
+
+If this option is set to `true`, the check will not warn on bitwise operations with positive integer literals, e.g. ~0, 2 << 1, etc.
+
+Default value is `false`.
+
+### hicpp-use-nullptr
+
+The hicpp-use-nullptr check is an alias, please see [modernize-use-nullptr](https://releases.llvm.org/17.0.1/tools/clang/tools/extra/docs/clang-tidy/checks/modernize/use-nullptr.html) for more information. It enforces the [rule 2.5.3](http://www.codingstandard.com/rule/2-5-3-use-nullptr-for-the-null-pointer-constant/).
+
 ## llvm-*
 
 Checks related to the LLVM coding conventions.
@@ -5242,6 +5489,246 @@ Checks related to the LLVM coding conventions.
 ## misc-*
 
 Checks that we didn’t have a better category for.
+
+### misc-const-correctness
+
+This check implements detection of local variables which could be declared as `const` but are not.
+
+这个检查实现了对局部变量的检测，这些局部变量可以声明为`const`，但实际上没有。
+
+Declaring variables as `const` is required or recommended by many coding guidelines, such as:
+
+- [ES.25](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#es25-declare-an-object-const-or-constexpr-unless-you-want-to-modify-its-value-later-on) from the C++ Core Guidelines and
+- [AUTOSAR C++14 Rule A7-1-1 (6.7.1 Specifiers)](https://www.autosar.org/fileadmin/user_upload/standards/adaptive/17-03/AUTOSAR_RS_CPP14Guidelines.pdf).
+
+Please note that this check’s analysis is type-based only. Variables that are not modified but used to create a non-const handle that might escape the scope are not diagnosed as potential `const`.
+
+请注意，此检查的分析仅基于类型。未修改但用于创建可能逃离作用域的非`const`句柄的变量不会被诊断为潜在的`const`。
+
+```c++
+// Declare a variable, which is not ``const`` ...
+int i = 42;
+// but use it as read-only. This means that `i` can be declared ``const``.
+int result = i * i;       // Before transformation
+int const result = i * i; // After transformation
+```
+
+The check can analyze values, pointers and references but not (yet) pointees:
+
+```c++
+// Normal values like built-ins or objects.
+int potential_const_int = 42;       // Before transformation
+int const potential_const_int = 42; // After transformation
+int copy_of_value = potential_const_int;
+
+MyClass could_be_const;       // Before transformation
+MyClass const could_be_const; // After transformation
+could_be_const.const_qualified_method();
+
+// References can be declared const as well.
+int &reference_value = potential_const_int;       // Before transformation
+int const& reference_value = potential_const_int; // After transformation
+int another_copy = reference_value;
+
+// The similar semantics of pointers are not (yet) analyzed.
+int *pointer_variable = &potential_const_int; // _NO_ 'const int *pointer_variable' suggestion.
+int last_copy = *pointer_variable;
+```
+
+The automatic code transformation is only applied to variables that are declared in single declarations. You may want to prepare your code base with [readability-isolate-declaration](https://releases.llvm.org/17.0.1/tools/clang/tools/extra/docs/clang-tidy/checks/readability/isolate-declaration.html) first.
+
+Note that there is the check [cppcoreguidelines-avoid-non-const-global-variables](https://releases.llvm.org/17.0.1/tools/clang/tools/extra/docs/clang-tidy/checks/cppcoreguidelines/avoid-non-const-global-variables.html) to enforce `const` correctness on all globals.
+
+#### Known Limitations
+
+The check does not run on C code.
+
+The check will not analyze templated variables or variables that are instantiation dependent. Different instantiations can result in different `const` correctness properties and in general it is not possible to find all instantiations of a template. The template might be used differently in an independent translation unit.
+
+Pointees can not be analyzed for constness yet. The following code shows this limitation.
+
+```c++
+// Declare a variable that will not be modified.
+int constant_value = 42;
+
+// Declare a pointer to that variable, that does not modify either, but misses 'const'.
+// Could be 'const int *pointer_to_constant = &constant_value;'
+int *pointer_to_constant = &constant_value;
+
+// Usage:
+int result = 520 * 120 * (*pointer_to_constant);
+```
+
+#### Options
+
+##### `AnalyzeValues`
+
+(default = true)
+
+Enable or disable the analysis of ordinary value variables, like `int i = 42;`
+
+```c++
+// Warning
+int i = 42;
+// No warning
+int const i = 42;
+
+// Warning
+int a[] = {42, 42, 42};
+// No warning
+int const a[] = {42, 42, 42};
+```
+
+##### `AnalyzeReferences`
+
+(default = true)
+
+Enable or disable the analysis of reference variables, like `int &ref = i;`
+
+```c++
+int i = 42;
+// Warning
+int& ref = i;
+// No warning
+int const& ref = i;
+```
+
+##### `WarnPointersAsValues`
+
+(default = false)
+
+This option enables the suggestion for `const` of the pointer itself.
+
+Pointer values have two possibilities to be `const`, the pointer and the value pointing to.
+
+```c++
+int value = 42;
+
+// Warning
+const int * pointer_variable = &value;
+// No warning
+const int *const pointer_variable = &value;
+```
+
+##### `TransformValues`
+
+(default = true)
+
+Provides fixit-hints for value types that automatically add `const` if its a single declaration.
+
+```c++
+// Before
+int value = 42;
+// After
+int const value = 42;
+
+// Before
+int a[] = {42, 42, 42};
+// After
+int const a[] = {42, 42, 42};
+
+// Result is modified later in its life-time. No diagnostic and fixit hint will be emitted.
+int result = value * 3;
+result -= 10;
+```
+
+##### `TransformReferences`
+
+(default = true)
+
+Provides fixit-hints for reference types that automatically add `const` if its a single declaration.
+
+```c++
+// This variable could still be a constant. But because there is a non-const reference to
+// it, it can not be transformed (yet).
+int value = 42;
+// The reference 'ref_value' is not modified and can be made 'const int &ref_value = value;'
+// Before
+int &ref_value = value;
+// After
+int const &ref_value = value;
+
+// Result is modified later in its life-time. No diagnostic and fixit hint will be emitted.
+int result = ref_value * 3;
+result -= 10;
+```
+
+##### `TransformPointersAsValues`
+
+(default = false)
+
+Provides fixit-hints for pointers if their pointee is not changed. This does not analyze if the value-pointed-to is unchanged!
+
+Requires `WarnPointersAsValues` to be `true`.
+
+```c++
+int value = 42;
+
+// Before
+const int * pointer_variable = &value;
+// After
+const int *const pointer_variable = &value;
+
+// Before
+const int * a[] = {&value, &value};
+// After
+const int *const a[] = {&value, &value};
+
+// Before
+int *ptr_value = &value;
+// After
+int *const ptr_value = &value;
+
+int result = 100 * (*ptr_value); // Does not modify the pointer itself.
+// This modification of the pointee is still allowed and not diagnosed.
+*ptr_value = 0;
+
+// The following pointer may not become a 'int *const'.
+int *changing_pointee = &value;
+changing_pointee = &result;
+```
+
+
+
+
+
+### misc-include-cleaner
+
+Checks for unused and missing includes. Generates findings only for the main file of a translation unit.
+
+检查未使用的和缺失的头文件包含。仅为翻译单元的主文件生成结果。
+
+Findings correspond to https://clangd.llvm.org/design/include-cleaner.
+
+Example:
+
+```c++
+// foo.h
+class Foo{};
+
+// bar.h
+#include "baz.h"
+class Bar{};
+
+// baz.h
+class Baz{};
+
+// main.cc
+#include "bar.h" // OK: uses class Bar from bar.h
+#include "foo.h" // warning: unused include "foo.h"
+Bar bar;
+Baz baz; // warning: missing include "baz.h"
+```
+
+#### Options
+
+##### `IgnoreHeaders`
+
+A semicolon-separated list of regexes to disable insertion/removal of header files that match this regex as a suffix.
+
+E.g., `foo/.*` disables insertion/removal for all headers under the directory foo.
+
+By default, no headers will be ignored.
 
 ### misc-non-private-member-variables-in-classes
 
@@ -5349,13 +5836,13 @@ This check requires using C++14 or higher to run.
 
 ### modernize-avoid-c-arrays
 
-cppcoreguidelines-avoid-c-arrays redirects here as an alias for this check.
+`cppcoreguidelines-avoid-c-arrays` redirects here as an alias for this check.
 
-hicpp-avoid-c-arrays redirects here as an alias for this check.
+`hicpp-avoid-c-arrays` redirects here as an alias for this check.
 
 Finds C-style array types and recommend to use `std::array<>` / `std::vector<>`. All types of C arrays are diagnosed.
 
-However, fix-it are potentially dangerous in header files and are therefore **not emitted** right now.
+However, fix-it are potentially dangerous in header files and are therefore not emitted right now.
 
 ```c++
 int a[] = {1, 2};	// warning: do not declare C-style arrays, use std::array<> instead
@@ -7009,7 +7496,7 @@ The check converts the usage of null pointer constants (e.g. `NULL`, `0`) to use
 
 #### Example
 
-```
+```c++
 void assignment() {
   char *a = NULL;
   char *b = 0;
@@ -7023,7 +7510,7 @@ int *ret_ptr() {
 
 transforms to:
 
-```
+```c++
 void assignment() {
   char *a = nullptr;
   char *b = nullptr;
@@ -8134,6 +8621,91 @@ After making a member function `static`, you might want to run the check `readab
 
 >在将成员函数设置为`static`之后，您可能需要运行检查`readable -static-accessed-through-instance`，以`Class::method()`取代`Instance.method()`之类的调用。
 
+### readability-else-after-return
+
+LLVM Coding Standards advises to reduce indentation where possible and where it makes understanding code easier. Early exit is one of the suggested enforcements of that. Please do not use else or else if after something that interrupts control flow - like return, break, continue, throw.
+
+LLVM编码标准建议尽可能减少缩进，这样更容易理解代码。提前退出是建议的措施之一。请不要在一些中断控制流的东西之后使用`else`或`else if`，如`return`, `break`, `continue`, `throw`。
+
+The following piece of code illustrates how the check works.
+
+This piece of code:
+
+```c++
+void foo(int Value) {
+    int Local = 0;
+    for (int i = 0; i < 42; i++) {
+        if (Value == 1) {
+            return;
+        } else {
+            Local++;
+        }
+
+        if (Value == 2) {
+            continue;
+        } else {
+            Local++;
+        }
+
+        if (Value == 3) {
+            throw 42;
+        } else {
+            Local++;
+        }
+    }
+}
+```
+
+Would be transformed into:
+
+```c++
+void foo(int Value) {
+    int Local = 0;
+    for (int i = 0; i < 42; i++) {
+        if (Value == 1) {
+            return;
+        }
+        Local++;
+
+        if (Value == 2) {
+            continue;
+        }
+        Local++;
+
+        if (Value == 3) {
+            throw 42;
+        }
+        Local++;
+    }
+}
+```
+
+#### Options
+
+##### `WarnOnUnfixable`
+
+When `true`, emit a warning for cases where the check can’t output a Fix-It. These can occur with declarations inside the else branch that would have an extended lifetime if the else branch was removed.
+
+当`true`时，在检查无法输出`Fix-It`的情况下发出警告。
+
+这可能发生在`else`分支内的声明中，如果删除`else`分支，该声明的生存期将延长。
+
+Default value is `true`.
+
+##### `WarnOnConditionVariables`
+
+When `true`, the check will attempt to refactor a variable defined inside the condition of the if statement that is used in the else branch defining them just before the if statement. This can only be done if the if statement is the last statement in its parent’s scope.
+
+当为`true`时，检查将尝试重构在`if`语句的条件中定义的变量，该变量在`else`分支中使用，在`if`语句之前定义它们。只有当`if`语句是其父作用域中的最后一条语句时，才能执行此操作。
+
+Default value is `true`.
+
+#### LLVM alias
+
+There is an alias of this check called `llvm-else-after-return`. In that version the options `WarnOnUnfixable` and `WarnOnConditionVariables` are both set to `false` by default.
+
+This check helps to enforce this LLVM Coding Standards recommendation.
+
 ### readability-named-parameter
 
 Find functions with unnamed arguments.
@@ -8239,6 +8811,43 @@ const auto &Foo3 = cast<const int &>(Bar3);
 ```
 
 Note in the LLVM alias, the default value is `false`.
+
+### readability-redundant-string-init
+
+Finds unnecessary string initializations.
+
+Examples
+
+```c++
+// Initializing string with empty string literal is unnecessary.
+std::string a = "";
+std::string b("");
+
+// becomes
+std::string a;
+std::string b;
+
+// Initializing a string_view with an empty string literal produces an
+// instance that compares equal to string_view().
+std::string_view a = "";
+std::string_view b("");
+
+// becomes
+std::string_view a;
+std::string_view b;
+```
+
+#### Options
+
+##### `StringNames`
+
+Default is `::std::basic_string`, `::std::basic_string_view`.
+
+Semicolon-delimited list of class names to apply this check to.
+
+By default `::std::basic_string` applies to `std::string` and `std::wstring`.
+
+Set to e.g. `::std::basic_string`, `llvm::StringRef`, `QString` to perform this check on custom classes.
 
 ### readability-static-accessed-through-instance
 
