@@ -4,32 +4,47 @@ url = ""
 weight = -110
 
 [[main]]
-name = "C++"
+name = "C++ Best Practices"
 url = ""
 weight = -109
 
 [[main]]
-parent = "C++"
+parent = "C++ Best Practices"
 name = "Clang-Tidy"
 url = "post/cpp/clang-tidy/clang-tidy"
 
 [[main]]
-parent = "C++"
+parent = "C++ Best Practices"
 name = "C++ Core Guidelines"
 url = "post/cpp/cpp-core-guidelines/cpp-core-guidelines"
 
 [[main]]
-parent = "C++"
-name = "More C++ Idioms"
-url = "post/cpp/more-cpp-idioms/more-cpp-idioms"
-
-[[main]]
-name = "Algo"
+name = "Design Pattern"
 url = ""
 weight = -108
 
 [[main]]
-name = "Design Pattern"
+parent = "Design Pattern"
+name = "Architectural Patterns"
+url = "post/cpp/more-cpp-idioms/more-cpp-idioms"
+
+[[main]]
+parent = "Design Pattern"
+name = "Concurrency Patterns"
+url = "post/cpp/more-cpp-idioms/more-cpp-idioms"
+
+[[main]]
+parent = "Design Pattern"
+name = "Design Patterns"
+url = "post/cpp/more-cpp-idioms/more-cpp-idioms"
+
+[[main]]
+parent = "Design Pattern"
+name = "Idioms"
+url = "post/cpp/more-cpp-idioms/more-cpp-idioms"
+
+[[main]]
+name = "Algorithm"
 url = ""
 weight = -107
 
