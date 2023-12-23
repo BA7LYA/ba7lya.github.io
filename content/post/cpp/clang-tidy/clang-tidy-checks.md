@@ -22,7 +22,7 @@ comment: true
 
 # Clang-Tidy Checks
 
-> 注：Clang-Tidy是C++最佳实践之集大成者，规则众多，文档清晰，实践性强，易于使用，支持定制规则，十分强大。
+> 注：Clang-Tidy是C++最佳实践之集大成者，规则众多，实践性强，易于使用，可定制规则，十分好用。
 
 ## abseil-*
 

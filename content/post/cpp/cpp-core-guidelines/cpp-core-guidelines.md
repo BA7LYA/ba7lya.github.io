@@ -180,32 +180,32 @@ Parameter passing expression rules:
 
 Parameter passing semantic rules:
 
-- F.22: Use `T*` or `owner<T*>` to designate a single object
-- F.23: Use a `not_null<T>` to indicate that “null” is not a valid value
-- F.24: Use a `span<T>` or a `span_p<T>` to designate a half-open sequence
-- F.25: Use a `zstring` or a `not_null<zstring>` to designate a C-style string
-- F.26: Use a `unique_ptr<T>` to transfer ownership where a pointer is needed
-- F.27: Use a `shared_ptr<T>` to share ownership
+- [F.22: Use `T*` or `owner<T*>` to designate a single object]({{< ref "cpp-core-guidelines-f-22.md" >}})
+- [F.23: Use a `not_null<T>` to indicate that “null” is not a valid value]({{< ref "cpp-core-guidelines-f-23.md" >}})
+- [F.24: Use a `span<T>` or a `span_p<T>` to designate a half-open sequence]({{< ref "cpp-core-guidelines-f-24.md" >}})
+- [F.25: Use a `zstring` or a `not_null<zstring>` to designate a C-style string]({{< ref "cpp-core-guidelines-f-25.md" >}})
+- [F.26: Use a `unique_ptr<T>` to transfer ownership where a pointer is needed]({{< ref "cpp-core-guidelines-f-26.md" >}})
+- [F.27: Use a `shared_ptr<T>` to share ownership]({{< ref "cpp-core-guidelines-f-27.md" >}})
 
 Value return semantic rules:
 
-- F.42: Return a `T*` to indicate a position (only)
-- F.43: Never (directly or indirectly) return a pointer or a reference to a local object
-- F.44: Return a `T&` when copy is undesirable and “returning no object” isn’t needed
-- F.45: Don’t return a `T&&`
-- F.46: `int` is the return type for `main()`
-- F.47: Return `T&` from assignment operators
-- F.48: Don’t return `std::move(local)`
-- F.49: Don’t return `const T`
+- [F.42: Return a `T*` to indicate a position (only)]({{< ref "cpp-core-guidelines-f-42.md" >}})
+- [F.43: Never (directly or indirectly) return a pointer or a reference to a local object]({{< ref "cpp-core-guidelines-f-43.md" >}})
+- [F.44: Return a `T&` when copy is undesirable and “returning no object” isn’t needed]({{< ref "cpp-core-guidelines-f-44.md" >}})
+- [F.45: Don’t return a `T&&`]({{< ref "cpp-core-guidelines-f-45.md" >}})
+- [F.46: `int` is the return type for `main()`]({{< ref "cpp-core-guidelines-f-46.md" >}})
+- [F.47: Return `T&` from assignment operators]({{< ref "cpp-core-guidelines-f-47.md" >}})
+- [F.48: Don’t return `std::move(local)`]({{< ref "cpp-core-guidelines-f-48.md" >}})
+- [F.49: Don’t return `const T`]({{< ref "cpp-core-guidelines-f-49.md" >}})
 
 Other function rules:
 
-- F.50: Use a lambda when a function won’t do (to capture local variables, or to write a local function)
-- F.51: Where there is a choice, prefer default arguments over overloading
-- F.52: Prefer capturing by reference in lambdas that will be used locally, including passed to algorithms
-- F.53: Avoid capturing by reference in lambdas that will be used non-locally, including returned, stored on the heap, or passed to another thread
-- F.54: When writing a lambda that captures `this` or any class data member, don’t use `[=]` default capture
-- F.55: Don’t use `va_arg` arguments
-- F.56: Avoid unnecessary condition nesting
+- [F.50: Use a lambda when a function won’t do (to capture local variables, or to write a local function)]({{< ref "cpp-core-guidelines-f-50.md" >}})
+- [F.51: Where there is a choice, prefer default arguments over overloading]({{< ref "cpp-core-guidelines-f-51.md" >}})
+- [F.52: Prefer capturing by reference in lambdas that will be used locally, including passed to algorithms]({{< ref "cpp-core-guidelines-f-52.md" >}})
+- [F.53: Avoid capturing by reference in lambdas that will be used non-locally, including returned, stored on the heap, or passed to another thread]({{< ref "cpp-core-guidelines-f-53.md" >}})
+- [F.54: When writing a lambda that captures `this` or any class data member, don’t use `[=]` default capture]({{< ref "cpp-core-guidelines-f-54.md" >}})
+- [F.55: Don’t use `va_arg` arguments]({{< ref "cpp-core-guidelines-f-55.md" >}})
+- [F.56: Avoid unnecessary condition nesting]({{< ref "cpp-core-guidelines-f-56.md" >}})
 
 Functions have strong similarities to lambdas and function objects.
