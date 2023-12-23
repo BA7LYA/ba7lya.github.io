@@ -1,5 +1,5 @@
 ---
-title: "C++ Core Guidelines F.52 注解
+title: "C++ Core Guidelines F.52 注解"
 date: 2023-12-22T21:56:10+08:00
 description: "C++ Core Guidelines F.52 注解"
 featured: false
