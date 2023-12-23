@@ -15,6 +15,11 @@ url = "post/cpp/clang-tidy/clang-tidy"
 
 [[main]]
 parent = "C++ Best Practices"
+name = "C++ Sanitizer"
+url = ""
+
+[[main]]
+parent = "C++ Best Practices"
 name = "C++ Core Guidelines"
 url = "post/cpp/cpp-core-guidelines/cpp-core-guidelines"
 
