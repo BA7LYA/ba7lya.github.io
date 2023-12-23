@@ -49,9 +49,14 @@ url = ""
 weight = -107
 
 [[main]]
+name = "C++ Libraries"
+url = ""
+weight = -106
+
+[[main]]
 name = "About"
 url = "about/"
-weight = -106
+weight = -105
 
 [[social]]
 name = "github"
